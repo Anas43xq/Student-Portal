@@ -1,0 +1,39 @@
+name: Create PR for chore/remove-stale-docs
+
+on:
+  push:
+    branches:
+      - chore/remove-stale-docs
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  create_pr:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Create Pull Request if not exists
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const head = 'chore/remove-stale-docs';
+            const base = 'main';
+            const title = 'chore: remove stale docs/ and add GH Actions deploy to gh-pages';
+            const body = 'This PR removes the stale docs/ folder and adds a GitHub Actions workflow to deploy the frontend to gh-pages.';
+
+            // Check if an open PR already exists for this head -> base
+            const { data: prs } = await github.rest.pulls.list({ owner, repo, head: `${owner}:${head}`, base, state: 'open' });
+            if (prs && prs.length > 0) {
+              console.log('PR already exists:', prs[0].html_url);
+            } else {
+              const { data } = await github.rest.pulls.create({ owner, repo, head, base, title, body });
+              console.log('Created PR:', data.html_url);
+            }
