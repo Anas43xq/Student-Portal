@@ -24,3 +24,9 @@ Thumbs.db
 
 # GitHub Pages branch locally
 gh-pages/
+
+# Backend local environment (ignored)
+backend/config.env
+
+# Keep example config in repo
+backend/config.env.example

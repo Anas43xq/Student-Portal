@@ -4,7 +4,9 @@ const bcrypt = require("bcryptjs");
 const bodyParser = require("body-parser");
 const cors = require("cors");
 const session = require("express-session");
-require('dotenv').config();
+const path = require('path');
+const envPath = path.join(__dirname, 'Configurations.env');
+require('dotenv').config({ path: envPath });
 
 const app = express();
 
@@ -15,8 +17,10 @@ app.use(cors({
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
+const sessionSecret = process.env.SESSION_SECRET || 'dev-local-session-secret';
+
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'bxrnvYJaquBOgjPEgjmPHDRrCRjsYDYu-secret-key-2024',
+  secret: sessionSecret,
   resave: false,
   saveUninitialized: false,
   cookie: {
@@ -27,11 +31,14 @@ app.use(session({
 }));
 
 const db = mysql.createPool({
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
-  port: process.env.DB_PORT
+  host: process.env.DB_HOST || 'localhost',
+  user: process.env.DB_USER || 'root',
+  password: process.env.DB_PASSWORD || '',
+  database: process.env.DB_NAME || '',
+  port: parseInt(process.env.DB_PORT, 10) || 3306,
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0
 });
 
 db.getConnection((err, connection) => {
