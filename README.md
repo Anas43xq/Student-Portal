@@ -8,7 +8,7 @@ This repository contains the Student Portal frontend (React) and backend (Node.j
 
 ## Deployment (GitHub Pages)
 - A GitHub Actions workflow is included at `.github/workflows/deploy.yml` that builds and deploys the frontend to the `gh-pages` branch on each push to `main`.
-- The site will be published at the URL configured in `frontend/package.json` `homepage` field: `https://AnoProgram.github.io/Student-Portal`.
+- The site will be published at the URL configured in `frontend/package.json` `homepage` field: `https://Anas43xq.github.io/Student-Portal`.
 
 ## Local build
 - To build locally:
