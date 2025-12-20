@@ -1,9 +1,8 @@
 const API_BASE_URL = 'https://student-portal-owa4.onrender.com';
 
-// Default fetch wrapper using cookie-based sessions (credentials included)
+// Simple fetch wrapper without complex authentication
 const apiFetch = (url, options = {}) => {
-  const opts = Object.assign({ credentials: 'include' }, options);
-  return fetch(url, opts);
+  return fetch(url, options);
 };
 
 // ============================================
