@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
+import { apiFetch, authAPI } from '../services/api';
 
 const API_BASE_URL = 'https://student-portal-owa4.onrender.com';
 
@@ -19,18 +20,17 @@ export const AuthProvider = ({ children }) => {
     const validateSession = async () => {
       if (user) {
         try {
-          const response = await fetch(`${API_BASE_URL}/api/auth/validate`, {
-            credentials: 'include'
-          });
-          
-          if (!response.ok) {
-            // Session invalid, clear local storage
+          const response = await apiFetch(`${API_BASE_URL}/api/auth/validate`);
+          const data = await response.json();
+          if (!response.ok || !data.valid) {
+            // Token invalid, clear local storage
             setUser(null);
             localStorage.removeItem("user");
+            localStorage.removeItem('token');
           }
         } catch (error) {
-          // Backend not available or session invalid
-          console.warn('Session validation failed:', error);
+          // Backend not available or token invalid
+          console.warn('Token validation failed:', error);
         }
       }
       setSessionChecked(true);
@@ -47,9 +47,17 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem("user", JSON.stringify(cleanUser));
   };
 
-  const logout = () => {
+  const logout = async () => {
+    // Best-effort notify server (JWT logout is client-side) and clear local data
+    try {
+      await authAPI.logout();
+    } catch (err) {
+      console.warn('Logout request failed:', err);
+    }
+
     setUser(null);
     localStorage.removeItem("user");
+    localStorage.removeItem('token');
   };
 
   return (

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { FileText, Filter, CheckCircle, XCircle, User } from 'lucide-react';
-import { instructorAPI, quizzesAPI, coursesAPI } from '../../services/api';
+import { instructorAPI, quizzesAPI, coursesAPI, instructorsAPI } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 
 const QuizResultsPage = () => {
@@ -33,12 +33,11 @@ const QuizResultsPage = () => {
 
       // Fetch instructors for admin users
       if (user.role === 'Admin') {
-        const response = await fetch('http://localhost:5000/api/instructors', {
-          credentials: 'include'
-        });
-        if (response.ok) {
-          const data = await response.json();
+        try {
+          const data = await instructorsAPI.getAll();
           setInstructors(data.instructors || []);
+        } catch (err) {
+          console.error('Failed to fetch instructors:', err);
         }
       }
 
@@ -62,13 +61,8 @@ const QuizResultsPage = () => {
       if (filterCourse !== 'All') params.append('courseId', filterCourse);
       if (filterInstructor !== 'All') params.append('instructorId', filterInstructor);
       
-      const response = await fetch(`http://localhost:5000/api/instructor/quiz-results?${params.toString()}`, {
-        credentials: 'include'
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setResults(data.results || []);
-      }
+      const data = await instructorAPI.getQuizResults(filterQuiz !== 'All' ? filterQuiz : null, filterCourse !== 'All' ? filterCourse : null);
+      setResults(data.results || []);
     } catch (err) {
       console.error('Failed to filter results:', err);
       setError('Failed to filter results');

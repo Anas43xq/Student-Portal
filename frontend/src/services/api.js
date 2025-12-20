@@ -1,5 +1,16 @@
 const API_BASE_URL = 'https://student-portal-owa4.onrender.com';
 
+// Helper to include JWT Authorization header automatically when token present
+const getAuthHeaders = () => {
+  const token = localStorage.getItem('token');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
+const apiFetch = (url, options = {}) => {
+  const headers = Object.assign({}, options.headers || {}, getAuthHeaders());
+  return fetch(url, Object.assign({}, options, { headers }));
+};
+
 // ============================================
 // UTILITY FUNCTIONS
 // ============================================
@@ -26,10 +37,9 @@ const handleError = (error) => {
 export const authAPI = {
   register: async (userData) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/register`, {
+      const response = await apiFetch(`${API_BASE_URL}/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify(userData)
       });
       return await handleResponse(response);
@@ -40,13 +50,17 @@ export const authAPI = {
 
   login: async (username, password) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/login`, {
+      const response = await apiFetch(`${API_BASE_URL}/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify({ username, password })
       });
-      return await handleResponse(response);
+      const data = await handleResponse(response);
+      // Persist token for subsequent requests
+      if (data.token) {
+        localStorage.setItem('token', data.token);
+      }
+      return data;
     } catch (error) {
       return handleError(error);
     }
@@ -54,10 +68,9 @@ export const authAPI = {
 
   logout: async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/logout`, {
-        method: 'POST',
-        credentials: 'include'
-      });
+      // Remove stored token first
+      localStorage.removeItem('token');
+      const response = await apiFetch(`${API_BASE_URL}/logout`, { method: 'POST' });
       return await handleResponse(response);
     } catch (error) {
       return handleError(error);
@@ -66,9 +79,7 @@ export const authAPI = {
 
   checkSession: async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/session`, {
-        credentials: 'include'
-      });
+      const response = await apiFetch(`${API_BASE_URL}/api/auth/session`);
       return await handleResponse(response);
     } catch (error) {
       return handleError(error);
@@ -84,9 +95,7 @@ export const studentsAPI = {
   getAll: async (params = {}) => {
     try {
       const queryString = new URLSearchParams(params).toString();
-      const response = await fetch(`${API_BASE_URL}/api/students?${queryString}`, {
-        credentials: 'include'
-      });
+      const response = await apiFetch(`${API_BASE_URL}/api/students?${queryString}`);
       return await handleResponse(response);
     } catch (error) {
       return handleError(error);
@@ -95,9 +104,16 @@ export const studentsAPI = {
 
   getById: async (id) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/students/${id}`, {
-        credentials: 'include'
-      });
+      const response = await apiFetch(`${API_BASE_URL}/api/students/${id}`);
+      return await handleResponse(response);
+    } catch (error) {
+      return handleError(error);
+    }
+  },
+
+  getInstructors: async (studentId) => {
+    try {
+      const response = await apiFetch(`${API_BASE_URL}/api/students/${studentId}/instructors`);
       return await handleResponse(response);
     } catch (error) {
       return handleError(error);
@@ -106,10 +122,9 @@ export const studentsAPI = {
 
   create: async (studentData) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/students`, {
+      const response = await apiFetch(`${API_BASE_URL}/api/students`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify(studentData)
       });
       return await handleResponse(response);
@@ -120,10 +135,9 @@ export const studentsAPI = {
 
   update: async (id, studentData) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/students/${id}`, {
+      const response = await apiFetch(`${API_BASE_URL}/api/students/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify(studentData)
       });
       return await handleResponse(response);
@@ -134,10 +148,7 @@ export const studentsAPI = {
 
   delete: async (id) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/students/${id}`, {
-        method: 'DELETE',
-        credentials: 'include'
-      });
+      const response = await apiFetch(`${API_BASE_URL}/api/students/${id}`, { method: 'DELETE' });
       return await handleResponse(response);
     } catch (error) {
       return handleError(error);
@@ -153,9 +164,7 @@ export const coursesAPI = {
   getAll: async (params = {}) => {
     try {
       const queryString = new URLSearchParams(params).toString();
-      const response = await fetch(`${API_BASE_URL}/api/courses?${queryString}`, {
-        credentials: 'include'
-      });
+      const response = await apiFetch(`${API_BASE_URL}/api/courses?${queryString}`);
       return await handleResponse(response);
     } catch (error) {
       return handleError(error);
@@ -164,9 +173,7 @@ export const coursesAPI = {
 
   getById: async (id) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/courses/${id}`, {
-        credentials: 'include'
-      });
+      const response = await apiFetch(`${API_BASE_URL}/api/courses/${id}`);
       return await handleResponse(response);
     } catch (error) {
       return handleError(error);
@@ -175,10 +182,9 @@ export const coursesAPI = {
 
   create: async (courseData) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/courses`, {
+      const response = await apiFetch(`${API_BASE_URL}/api/courses`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify(courseData)
       });
       return await handleResponse(response);
@@ -189,10 +195,9 @@ export const coursesAPI = {
 
   update: async (id, courseData) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/courses/${id}`, {
+      const response = await apiFetch(`${API_BASE_URL}/api/courses/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify(courseData)
       });
       return await handleResponse(response);
@@ -203,10 +208,7 @@ export const coursesAPI = {
 
   delete: async (id) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/courses/${id}`, {
-        method: 'DELETE',
-        credentials: 'include'
-      });
+      const response = await apiFetch(`${API_BASE_URL}/api/courses/${id}`, { method: 'DELETE' });
       return await handleResponse(response);
     } catch (error) {
       return handleError(error);
@@ -218,9 +220,7 @@ export const enrollmentsAPI = {
   getAll: async (params = {}) => {
     try {
       const queryString = new URLSearchParams(params).toString();
-      const response = await fetch(`${API_BASE_URL}/api/enrollments?${queryString}`, {
-        credentials: 'include'
-      });
+      const response = await apiFetch(`${API_BASE_URL}/api/enrollments?${queryString}`);
       return await handleResponse(response);
     } catch (error) {
       return handleError(error);
@@ -229,10 +229,9 @@ export const enrollmentsAPI = {
 
   create: async (enrollmentData) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/enrollments`, {
+      const response = await apiFetch(`${API_BASE_URL}/api/enrollments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify(enrollmentData)
       });
       return await handleResponse(response);
@@ -243,10 +242,9 @@ export const enrollmentsAPI = {
 
   update: async (id, enrollmentData) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/enrollments/${id}`, {
+      const response = await apiFetch(`${API_BASE_URL}/api/enrollments/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify(enrollmentData)
       });
       return await handleResponse(response);
@@ -257,10 +255,7 @@ export const enrollmentsAPI = {
 
   delete: async (id) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/enrollments/${id}`, {
-        method: 'DELETE',
-        credentials: 'include'
-      });
+      const response = await apiFetch(`${API_BASE_URL}/api/enrollments/${id}`, { method: 'DELETE' });
       return await handleResponse(response);
     } catch (error) {
       return handleError(error);
@@ -271,9 +266,7 @@ export const enrollmentsAPI = {
 export const adminAPI = {
   getStats: async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/admin/stats`, {
-        credentials: 'include'
-      });
+      const response = await apiFetch(`${API_BASE_URL}/api/admin/stats`);
       return await handleResponse(response);
     } catch (error) {
       return handleError(error);
@@ -282,9 +275,7 @@ export const adminAPI = {
 
   getUsers: async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/admin/users`, {
-        credentials: 'include'
-      });
+      const response = await apiFetch(`${API_BASE_URL}/api/admin/users`);
       return await handleResponse(response);
     } catch (error) {
       return handleError(error);
@@ -293,10 +284,9 @@ export const adminAPI = {
 
   createUser: async (userData) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/admin/users`, {
+      const response = await apiFetch(`${API_BASE_URL}/api/admin/users`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify(userData)
       });
       return await handleResponse(response);
@@ -307,9 +297,7 @@ export const adminAPI = {
 
   getActivities: async (limit = 10) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/admin/activities?limit=${limit}`, {
-        credentials: 'include'
-      });
+      const response = await apiFetch(`${API_BASE_URL}/api/admin/activities?limit=${limit}`);
       return await handleResponse(response);
     } catch (error) {
       return handleError(error);
@@ -318,10 +306,9 @@ export const adminAPI = {
 
   banUser: async (userId, reason) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/admin/users/${userId}/ban`, {
+      const response = await apiFetch(`${API_BASE_URL}/api/admin/users/${userId}/ban`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify({ reason })
       });
       return await handleResponse(response);
@@ -332,9 +319,8 @@ export const adminAPI = {
 
   unbanUser: async (userId) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/admin/users/${userId}/unban`, {
-        method: 'POST',
-        credentials: 'include'
+      const response = await apiFetch(`${API_BASE_URL}/api/admin/users/${userId}/unban`, {
+        method: 'POST'
       });
       return await handleResponse(response);
     } catch (error) {
@@ -344,9 +330,8 @@ export const adminAPI = {
 
   deleteUser: async (userId) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/admin/users/${userId}`, {
-        method: 'DELETE',
-        credentials: 'include'
+      const response = await apiFetch(`${API_BASE_URL}/api/admin/users/${userId}`, {
+        method: 'DELETE'
       });
       return await handleResponse(response);
     } catch (error) {
@@ -358,9 +343,18 @@ export const adminAPI = {
 export const instructorsAPI = {
   getAll: async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/instructors`, {
-        credentials: 'include'
-      });
+      const response = await apiFetch(`${API_BASE_URL}/api/instructors`);
+      return await handleResponse(response);
+    } catch (error) {
+      return handleError(error);
+    }
+  },
+
+  getStudents: async (instructorId, params = {}) => {
+    try {
+      const queryString = new URLSearchParams(params).toString();
+      const url = `${API_BASE_URL}/api/instructors/${instructorId}/students${queryString ? `?${queryString}` : ''}`;
+      const response = await apiFetch(url);
       return await handleResponse(response);
     } catch (error) {
       return handleError(error);
@@ -369,10 +363,9 @@ export const instructorsAPI = {
 
   create: async (instructorData) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/instructors`, {
+      const response = await apiFetch(`${API_BASE_URL}/api/instructors`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify(instructorData)
       });
       return await handleResponse(response);
@@ -383,10 +376,9 @@ export const instructorsAPI = {
 
   update: async (id, instructorData) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/instructors/${id}`, {
+      const response = await apiFetch(`${API_BASE_URL}/api/instructors/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify(instructorData)
       });
       return await handleResponse(response);
@@ -397,9 +389,8 @@ export const instructorsAPI = {
 
   delete: async (id) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/instructors/${id}`, {
-        method: 'DELETE',
-        credentials: 'include'
+      const response = await apiFetch(`${API_BASE_URL}/api/instructors/${id}`, {
+        method: 'DELETE'
       });
       return await handleResponse(response);
     } catch (error) {
@@ -412,9 +403,7 @@ export const quizzesAPI = {
   getAll: async (params = {}) => {
     try {
       const queryString = new URLSearchParams(params).toString();
-      const response = await fetch(`${API_BASE_URL}/api/quizzes?${queryString}`, {
-        credentials: 'include'
-      });
+      const response = await apiFetch(`${API_BASE_URL}/api/quizzes?${queryString}`);
       return await handleResponse(response);
     } catch (error) {
       return handleError(error);
@@ -423,10 +412,9 @@ export const quizzesAPI = {
 
   create: async (quizData) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/quizzes`, {
+      const response = await apiFetch(`${API_BASE_URL}/api/quizzes`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify(quizData)
       });
       return await handleResponse(response);
@@ -437,10 +425,9 @@ export const quizzesAPI = {
 
   update: async (id, quizData) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/quizzes/${id}`, {
+      const response = await apiFetch(`${API_BASE_URL}/api/quizzes/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify(quizData)
       });
       return await handleResponse(response);
@@ -451,9 +438,8 @@ export const quizzesAPI = {
 
   delete: async (id) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/quizzes/${id}`, {
-        method: 'DELETE',
-        credentials: 'include'
+      const response = await apiFetch(`${API_BASE_URL}/api/quizzes/${id}`, {
+        method: 'DELETE'
       });
       return await handleResponse(response);
     } catch (error) {
@@ -463,9 +449,7 @@ export const quizzesAPI = {
 
   getQuestions: async (quizId) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/quizzes/${quizId}/questions`, {
-        credentials: 'include'
-      });
+      const response = await apiFetch(`${API_BASE_URL}/api/quizzes/${quizId}/questions`);
       return await handleResponse(response);
     } catch (error) {
       return handleError(error);
@@ -474,9 +458,7 @@ export const quizzesAPI = {
 
   getMyAnswers: async (quizId) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/quizzes/${quizId}/my-answers`, {
-        credentials: 'include'
-      });
+      const response = await apiFetch(`${API_BASE_URL}/api/quizzes/${quizId}/my-answers`);
       return await handleResponse(response);
     } catch (error) {
       return handleError(error);
@@ -485,10 +467,9 @@ export const quizzesAPI = {
 
   addQuestion: async (quizId, questionData) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/quizzes/${quizId}/questions`, {
+      const response = await apiFetch(`${API_BASE_URL}/api/quizzes/${quizId}/questions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify(questionData)
       });
       return await handleResponse(response);
@@ -499,10 +480,9 @@ export const quizzesAPI = {
 
   updateQuestion: async (quizId, questionId, questionData) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/quizzes/${quizId}/questions/${questionId}`, {
+      const response = await apiFetch(`${API_BASE_URL}/api/quizzes/${quizId}/questions/${questionId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify(questionData)
       });
       return await handleResponse(response);
@@ -513,9 +493,8 @@ export const quizzesAPI = {
 
   deleteQuestion: async (quizId, questionId) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/quizzes/${quizId}/questions/${questionId}`, {
-        method: 'DELETE',
-        credentials: 'include'
+      const response = await apiFetch(`${API_BASE_URL}/api/quizzes/${quizId}/questions/${questionId}`, {
+        method: 'DELETE'
       });
       return await handleResponse(response);
     } catch (error) {
@@ -525,9 +504,8 @@ export const quizzesAPI = {
 
   gradeQuiz: async (quizId, studentId) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/quizzes/${quizId}/grade/${studentId}`, {
-        method: 'POST',
-        credentials: 'include'
+      const response = await apiFetch(`${API_BASE_URL}/api/quizzes/${quizId}/grade/${studentId}`, {
+        method: 'POST'
       });
       return await handleResponse(response);
     } catch (error) {
@@ -537,10 +515,9 @@ export const quizzesAPI = {
 
   updateSubmissionScore: async (submissionId, score) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/quiz-submissions/${submissionId}/score`, {
+      const response = await apiFetch(`${API_BASE_URL}/api/quiz-submissions/${submissionId}/score`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify({ score })
       });
       return await handleResponse(response);
@@ -551,9 +528,7 @@ export const quizzesAPI = {
 
   getQuizSubmissions: async (quizId) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/instructor/quiz-submissions/${quizId}`, {
-        credentials: 'include'
-      });
+      const response = await apiFetch(`${API_BASE_URL}/api/instructor/quiz-submissions/${quizId}`);
       return await handleResponse(response);
     } catch (error) {
       return handleError(error);
@@ -562,9 +537,7 @@ export const quizzesAPI = {
 
   getStudentAnswers: async (quizId, studentId) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/instructor/student-answers/${quizId}/${studentId}`, {
-        credentials: 'include'
-      });
+      const response = await apiFetch(`${API_BASE_URL}/api/instructor/student-answers/${quizId}/${studentId}`);
       return await handleResponse(response);
     } catch (error) {
       return handleError(error);
@@ -573,10 +546,9 @@ export const quizzesAPI = {
 
   submitQuiz: async (quizId, answers) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/quizzes/${quizId}/submit`, {
+      const response = await apiFetch(`${API_BASE_URL}/api/quizzes/${quizId}/submit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify({ answers })
       });
       return await handleResponse(response);
@@ -587,9 +559,7 @@ export const quizzesAPI = {
 
   getStudentSubmissions: async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/student/quiz-submissions`, {
-        credentials: 'include'
-      });
+      const response = await apiFetch(`${API_BASE_URL}/api/student/quiz-submissions`);
       return await handleResponse(response);
     } catch (error) {
       return handleError(error);
@@ -604,9 +574,7 @@ export const quizzesAPI = {
 export const instructorAPI = {
   getStats: async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/instructor/stats`, {
-        credentials: 'include'
-      });
+      const response = await apiFetch(`${API_BASE_URL}/api/instructor/stats`);
       return await handleResponse(response);
     } catch (error) {
       return handleError(error);
@@ -620,9 +588,7 @@ export const instructorAPI = {
       if (courseId) params.append('courseId', courseId);
       
       const url = `${API_BASE_URL}/api/instructor/quiz-results${params.toString() ? '?' + params.toString() : ''}`;
-      const response = await fetch(url, {
-        credentials: 'include'
-      });
+      const response = await apiFetch(url);
       return await handleResponse(response);
     } catch (error) {
       return handleError(error);
@@ -645,4 +611,5 @@ const api = {
   instructor: instructorAPI
 };
 
+export { apiFetch, getAuthHeaders };
 export default api;

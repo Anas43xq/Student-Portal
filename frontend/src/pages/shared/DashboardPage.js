@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Users, BookOpen, Calendar, GraduationCap, CheckCircle, XCircle } from 'lucide-react';
 import StatCard from '../../components/common/StatCard.js';
 import { useAuth } from '../../context/AuthContext';
-import { adminAPI, studentsAPI, enrollmentsAPI, instructorAPI } from '../../services/api';
+import { adminAPI, studentsAPI, enrollmentsAPI, instructorAPI, instructorsAPI, coursesAPI } from '../../services/api';
 
 const DashboardPage = () => {
   const { user } = useAuth();
@@ -153,36 +153,25 @@ const DashboardPage = () => {
       React.useEffect(() => {
         const fetchInstructorData = async () => {
           try {
-            // Get instructor ID
-            const instResponse = await fetch('http://localhost:5000/api/instructors', {
-              credentials: 'include'
-            });
-            if (instResponse.ok) {
-              const instData = await instResponse.json();
+            try {
+              const instData = await instructorsAPI.getAll();
               const currentInstructor = instData.instructors?.find(i => i.userId === user.id);
-              
+
               if (currentInstructor) {
                 // Fetch courses
-                const coursesResponse = await fetch('http://localhost:5000/api/courses', {
-                  credentials: 'include'
-                });
-                if (coursesResponse.ok) {
-                  const coursesData = await coursesResponse.json();
-                  setCourses(coursesData.courses || []);
-                }
+                const coursesData = await coursesAPI.getAll();
+                setCourses(coursesData.courses || []);
 
                 // Fetch students
                 setLoadingStudents(true);
-                const params = selectedCourse !== 'All' ? `?courseId=${selectedCourse}` : '';
-                const studentsResponse = await fetch(`http://localhost:5000/api/instructors/${currentInstructor.id}/students${params}`, {
-                  credentials: 'include'
-                });
-                if (studentsResponse.ok) {
-                  const studentsData = await studentsResponse.json();
-                  setStudents(studentsData.students || []);
-                }
+                const params = selectedCourse !== 'All' ? { courseId: selectedCourse } : {};
+                const studentsData = await instructorAPI.getStudents(currentInstructor.id, params);
+                setStudents(studentsData.students || []);
                 setLoadingStudents(false);
               }
+            } catch (err) {
+              console.error('Failed to fetch instructor data:', err);
+              setLoadingStudents(false);
             }
           } catch (err) {
             console.error('Failed to fetch instructor data:', err);

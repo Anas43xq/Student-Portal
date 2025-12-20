@@ -32,13 +32,8 @@ const ProfilePage = () => {
 
           // Fetch instructors
           try {
-            const response = await fetch(`http://localhost:5000/api/students/${user.studentId}/instructors`, {
-              credentials: 'include'
-            });
-            if (response.ok) {
-              const data = await response.json();
-              setInstructors(data.instructors || []);
-            }
+            const data = await studentsAPI.getInstructors(user.studentId);
+            setInstructors(data.instructors || []);
           } catch (err) {
             console.error('Failed to fetch instructors:', err);
           }
