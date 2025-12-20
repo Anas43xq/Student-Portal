@@ -18,9 +18,20 @@ jobs:
       - name: Check out
         uses: actions/checkout@v4
 
+      - name: Select token for GitHub API (PAT fallback to GITHUB_TOKEN)
+        id: token
+        run: |
+          # Use PAT if provided via repo secret `PAT`, otherwise fall back to the workflow token
+          if [ -n "${{ secrets.PAT }}" ]; then
+            echo "token=${{ secrets.PAT }}" >> $GITHUB_OUTPUT
+          else
+            echo "token=${{ github.token }}" >> $GITHUB_OUTPUT
+          fi
+
       - name: Create Pull Request if not exists
         uses: actions/github-script@v6
         with:
+          github-token: ${{ steps.token.outputs.token }}
           script: |
             const owner = context.repo.owner;
             const repo = context.repo.repo;
