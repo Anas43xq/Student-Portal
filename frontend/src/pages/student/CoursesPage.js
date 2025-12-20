@@ -32,6 +32,7 @@ const CoursesPage = () => {
     credits: '',
     department: '',
     semester: 'Fall',
+    year: new Date().getFullYear(),
     capacity: '',
     instructorId: ''
   });
@@ -195,6 +196,7 @@ const CoursesPage = () => {
       credits: course.credits || '',
       department: course.department || '',
       semester: course.semester || 'Fall',
+      year: course.year || new Date().getFullYear(),
       capacity: course.capacity || '',
       instructorId: firstInstructorId
     });
@@ -214,8 +216,8 @@ const CoursesPage = () => {
     e.preventDefault();
     setFormError('');
 
-    if (!formData.code || !formData.name || !formData.credits || !formData.department) {
-      setFormError('Code, name, credits, and department are required');
+    if (!formData.code || !formData.name || !formData.credits || !formData.department || !formData.semester || !formData.year) {
+      setFormError('Code, name, credits, department, semester, and year are required');
       return;
     }
 
@@ -484,18 +486,32 @@ const CoursesPage = () => {
                         placeholder="e.g., Computer Science"
                       />
                     </div>
-                    <div className="col-md-4">
-                      <label className="form-label">Semester</label>
+                    <div className="col-md-2">
+                      <label className="form-label">Semester *</label>
                       <select
                         className="form-select"
                         name="semester"
                         value={formData.semester}
                         onChange={handleInputChange}
+                        required
                       >
                         <option value="Fall">Fall</option>
                         <option value="Spring">Spring</option>
                         <option value="Summer">Summer</option>
                       </select>
+                    </div>
+                    <div className="col-md-2">
+                      <label className="form-label">Year *</label>
+                      <input
+                        type="number"
+                        className="form-control"
+                        name="year"
+                        value={formData.year}
+                        onChange={handleInputChange}
+                        required
+                        min="2020"
+                        max="2030"
+                      />
                     </div>
                     <div className="col-md-6">
                       <label className="form-label">Capacity</label>

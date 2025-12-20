@@ -54,15 +54,11 @@ const DashboardPage = () => {
           }
           
           const studentData = await studentsAPI.getById(user.studentId);
-          const enrollmentData = await enrollmentsAPI.getAll();
-          const currentSemesterCredits = enrollmentData.enrollments
-            ?.filter(e => e.status === 'Active')
-            .reduce((sum, e) => sum + (e.courseCredits || 0), 0) || 0;
-          
+
           setStats({
             studentGPA: studentData.gpa || 0,
-            studentEnrolledCourses: enrollmentData.enrollments?.filter(e => e.status === 'Active').length || 0,
-            totalCredits: currentSemesterCredits
+            studentEnrolledCourses: studentData.enrollments?.filter(e => e.status === 'Active').length || 0,
+            totalCredits: studentData.totalCredits || 0
           });
         }
       } catch (err) {
@@ -111,7 +107,7 @@ const DashboardPage = () => {
           <div className="row">
             <StatCard title="My GPA" value={stats.studentGPA} icon={GraduationCap} color="primary" />
             <StatCard title="Enrolled Courses" value={stats.studentEnrolledCourses} icon={BookOpen} color="success" />
-            <StatCard title="Current Semester Credits" value={stats.totalCredits} icon={Calendar} color="info" />
+            <StatCard title="Total Credits" value={stats.totalCredits} icon={Calendar} color="info" />
           </div>
         </section>
 
