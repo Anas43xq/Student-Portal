@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Users, BookOpen, Calendar, GraduationCap, CheckCircle, XCircle } from 'lucide-react';
 import StatCard from '../../components/common/StatCard.js';
 import { useAuth } from '../../context/AuthContext';
-import { adminAPI, studentsAPI, enrollmentsAPI, instructorAPI, instructorsAPI, coursesAPI } from '../../services/api';
+import { adminAPI, studentsAPI, enrollmentsAPI, instructorAPI, instructorsAPI, coursesAPI, authAPI } from '../../services/api';
 
 const DashboardPage = () => {
   const { user } = useAuth();
@@ -30,6 +30,8 @@ const DashboardPage = () => {
       
       try {
         if (user.role === 'Admin') {
+          // First check if session is valid
+          await authAPI.checkSession();
 
           const data = await adminAPI.getStats();
           setStats({
