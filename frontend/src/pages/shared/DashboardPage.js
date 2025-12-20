@@ -30,9 +30,6 @@ const DashboardPage = () => {
       
       try {
         if (user.role === 'Admin') {
-          // First check if session is valid
-          await authAPI.checkSession();
-
           const data = await adminAPI.getStats();
           setStats({
             totalStudents: data.totalStudents || 0,
@@ -58,8 +55,6 @@ const DashboardPage = () => {
           
           const studentData = await studentsAPI.getById(user.studentId);
           const enrollmentData = await enrollmentsAPI.getAll();
-          
-          // Calculate current semester credits from active enrollments
           const currentSemesterCredits = enrollmentData.enrollments
             ?.filter(e => e.status === 'Active')
             .reduce((sum, e) => sum + (e.courseCredits || 0), 0) || 0;
@@ -151,7 +146,6 @@ const DashboardPage = () => {
       const [selectedCourse, setSelectedCourse] = React.useState('All');
       const [loadingStudents, setLoadingStudents] = React.useState(false);
 
-      // eslint-disable-next-line react-hooks/exhaustive-deps
       React.useEffect(() => {
         const fetchInstructorData = async () => {
           try {
@@ -160,11 +154,9 @@ const DashboardPage = () => {
               const currentInstructor = instData.instructors?.find(i => i.userId === user.id);
 
               if (currentInstructor) {
-                // Fetch courses
                 const coursesData = await coursesAPI.getAll();
                 setCourses(coursesData.courses || []);
 
-                // Fetch students
                 setLoadingStudents(true);
                 const params = selectedCourse !== 'All' ? { courseId: selectedCourse } : {};
                 const studentsData = await instructorAPI.getStudents(currentInstructor.id, params);

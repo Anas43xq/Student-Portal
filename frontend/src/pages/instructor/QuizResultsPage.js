@@ -31,7 +31,6 @@ const QuizResultsPage = () => {
       const coursesData = await coursesAPI.getAll();
       setCourses(coursesData.courses || []);
 
-      // Fetch instructors for admin users
       if (user.role === 'Admin') {
         try {
           const data = await instructorsAPI.getAll();
@@ -127,7 +126,6 @@ const QuizResultsPage = () => {
         </div>
       )}
 
-      {/* Statistics Cards */}
       <section className="row mb-4">
         <div className="col-md-3 mb-3">
           <div className="card text-center">
@@ -167,7 +165,6 @@ const QuizResultsPage = () => {
         </div>
       </section>
 
-      {/* Filters */}
       <section className="card mb-4">
         <div className="card-body">
           <div className="row g-3">
@@ -249,7 +246,6 @@ const QuizResultsPage = () => {
         </div>
       </section>
 
-      {/* Results Table */}
       <section className="card">
         <div className="card-header">
           <h5 className="mb-0">Quiz Submissions ({filteredResults.length})</h5>
@@ -334,7 +330,7 @@ const QuizResultsPage = () => {
         </div>
       </section>
 
-      {/* Pass/Fail Criteria Note */}
+
       <section className="alert alert-info mt-4">
         <strong>Note:</strong> Students need to score at least 60% to pass a quiz.
       </section>

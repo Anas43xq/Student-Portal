@@ -38,11 +38,9 @@ db.getConnection((err, connection) => {
     console.error("Database connection failed:", err);
     return;
   }
-  console.log("Connected to MySQL database");
   connection.release();
 });
 
-// JWT-based auth middleware
 const requireAuth = (req, res, next) => {
   const authHeader = req.headers.authorization;
 
@@ -66,7 +64,6 @@ const requireAdmin = (req, res, next) => {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    console.log('requireAdmin - no auth header or not Bearer');
     return res.status(403).json({ message: "Admin access required" });
   }
 
@@ -74,10 +71,8 @@ const requireAdmin = (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
-    console.log('requireAdmin - decoded role:', decoded.role);
 
     if (decoded.role !== 'Admin') {
-      console.log('requireAdmin - user is not admin');
       return res.status(403).json({ message: "Admin access required" });
     }
 
@@ -273,7 +268,6 @@ app.get("/api/auth/session", requireAuth, (req, res) => {
   });
 });
 
-// Admin Routes
 app.get("/api/students", requireAdmin, (req, res) => {
   const { search, status, page = 1, limit = 10 } = req.query;
 

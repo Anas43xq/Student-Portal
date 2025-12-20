@@ -1,6 +1,5 @@
 const API_BASE_URL = 'https://student-portal-owa4.onrender.com';
 
-// JWT-based fetch wrapper
 const apiFetch = (url, options = {}) => {
   const token = localStorage.getItem('token');
   const headers = {
@@ -8,7 +7,6 @@ const apiFetch = (url, options = {}) => {
     ...options.headers
   };
 
-  // Don't add Authorization header for auth endpoints (login/register)
   if (token && !url.includes('/login') && !url.includes('/register')) {
     headers.Authorization = `Bearer ${token}`;
   }
@@ -17,16 +15,11 @@ const apiFetch = (url, options = {}) => {
   return fetch(url, opts);
 };
 
-// ============================================
-// UTILITY FUNCTIONS
-// ============================================
-
 const handleResponse = async (response) => {
   let data;
   try {
     data = await response.json();
   } catch (e) {
-    // If response is not JSON, fall back to text
     const text = await response.text();
     if (!response.ok) throw new Error(text || 'An error occurred');
     return text;
@@ -40,13 +33,8 @@ const handleResponse = async (response) => {
 };
 
 const handleError = (error) => {
-  console.error('API Error:', error);
   throw error;
 };
-
-// ============================================
-// SHARED APIs (All Roles)
-// ============================================
 
 export const authAPI = {
   register: async (userData) => {
@@ -93,10 +81,6 @@ export const authAPI = {
     }
   }
 };
-
-// ============================================
-// ADMIN APIs
-// ============================================
 
 export const studentsAPI = {
   getAll: async (params = {}) => {
@@ -162,10 +146,6 @@ export const studentsAPI = {
     }
   }
 };
-
-// ============================================
-// STUDENT APIs
-// ============================================
 
 export const coursesAPI = {
   getAll: async (params = {}) => {
@@ -574,10 +554,6 @@ export const quizzesAPI = {
   }
 };
 
-// ============================================
-// INSTRUCTOR APIs
-// ============================================
-
 export const instructorAPI = {
   getStats: async () => {
     try {
@@ -602,10 +578,6 @@ export const instructorAPI = {
     }
   }
 };
-
-// ============================================
-// UNIFIED API EXPORT
-// ============================================
 
 const api = {
   auth: authAPI,

@@ -71,9 +71,7 @@ const CoursesPage = () => {
       const activeEnrollments = data.enrollments?.filter(e => e.status === 'Active') || [];
       setStudentEnrollments(activeEnrollments);
       
-      // Calculate credits from active enrollments for current semester
       const credits = activeEnrollments.reduce((sum, e) => {
-
         if (e.semester === currentSemester) {
           return sum + (parseInt(e.courseCredits) || 0);
         }
@@ -92,7 +90,6 @@ const CoursesPage = () => {
     }
   }, [fetchCourses, fetchStudentEnrollments, user]);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     fetchCourses();
   }, [searchTerm, filterDept, filterSemester]);
