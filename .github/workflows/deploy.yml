@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - master
 
 jobs:
   build-and-deploy:
@@ -17,16 +18,20 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
 
       - name: Install frontend dependencies
         run: |
           cd frontend
-          npm install
+          npm ci
 
       - name: Build frontend
         run: |
           cd frontend
           npm run build
+        env:
+          CI: false
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
@@ -34,6 +39,4 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./frontend/build
           publish_branch: gh-pages
-          # Optionally, set user_name and user_email if you want specific commit author
-          # user_name: 'github-actions[bot]'
-          # user_email: '41898282+github-actions[bot]@users.noreply.github.com'
+          cname: anas43xq.github.io
