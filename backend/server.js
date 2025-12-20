@@ -2046,12 +2046,7 @@ app.get("/api/student/quiz-submissions", requireAuth, (req, res) => {
 });
 
 app.get("/api/instructor/quiz-results", requireAuth, (req, res) => {
-  const instructorId = req.user.instructorId;
   const { quizId, courseId } = req.query;
-
-  if (!instructorId) {
-    return res.status(400).json({ message: "Instructor ID not found in token" });
-  }
 
   let query = `
     SELECT qs.*, q.title, q.courseId, c.name as courseName, s.id as studentId, u.firstName, u.lastName
@@ -2060,10 +2055,22 @@ app.get("/api/instructor/quiz-results", requireAuth, (req, res) => {
     JOIN Courses c ON q.courseId = c.id
     JOIN Students s ON qs.studentId = s.id
     JOIN Users u ON s.userId = u.id
-    JOIN CourseInstructors ci ON c.id = ci.courseId
-    WHERE ci.instructorId = ?
   `;
-  const params = [instructorId];
+  const params = [];
+
+  // For instructors, filter by their assigned courses
+  if (req.user.role === 'Instructor') {
+    const instructorId = req.user.instructorId;
+    if (!instructorId) {
+      return res.status(400).json({ message: "Instructor ID not found in token" });
+    }
+
+    query += ` JOIN CourseInstructors ci ON c.id = ci.courseId WHERE ci.instructorId = ?`;
+    params.push(instructorId);
+  } else {
+    // For admins, no filtering needed
+    query += ` WHERE 1=1`;
+  }
 
   if (quizId) {
     query += ` AND q.id = ?`;
