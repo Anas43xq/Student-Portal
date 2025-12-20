@@ -36,19 +36,9 @@ jobs:
         env:
           CI: false
 
-      - name: Select token for GitHub API (PAT fallback to GITHUB_TOKEN)
-        id: token
-        run: |
-          # Use PAT if provided via repo secret `PAT`, otherwise fall back to the workflow token
-          if [ -n "${{ secrets.PAT }}" ]; then
-            echo "token=${{ secrets.PAT }}" >> $GITHUB_OUTPUT
-          else
-            echo "token=${{ github.token }}" >> $GITHUB_OUTPUT
-          fi
-
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
         with:
-          github_token: ${{ steps.token.outputs.token }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./frontend/build
           publish_branch: gh-pages

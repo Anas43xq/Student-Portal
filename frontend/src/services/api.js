@@ -1,14 +1,9 @@
 const API_BASE_URL = 'https://student-portal-owa4.onrender.com';
 
-// Helper to include JWT Authorization header automatically when token present
-const getAuthHeaders = () => {
-  const token = localStorage.getItem('token');
-  return token ? { Authorization: `Bearer ${token}` } : {};
-};
-
+// Default fetch wrapper using cookie-based sessions (credentials included)
 const apiFetch = (url, options = {}) => {
-  const headers = Object.assign({}, options.headers || {}, getAuthHeaders());
-  return fetch(url, Object.assign({}, options, { headers }));
+  const opts = Object.assign({ credentials: 'include' }, options);
+  return fetch(url, opts);
 };
 
 // ============================================
@@ -55,12 +50,7 @@ export const authAPI = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password })
       });
-      const data = await handleResponse(response);
-      // Persist token for subsequent requests
-      if (data.token) {
-        localStorage.setItem('token', data.token);
-      }
-      return data;
+      return await handleResponse(response);
     } catch (error) {
       return handleError(error);
     }
@@ -68,8 +58,6 @@ export const authAPI = {
 
   logout: async () => {
     try {
-      // Remove stored token first
-      localStorage.removeItem('token');
       const response = await apiFetch(`${API_BASE_URL}/logout`, { method: 'POST' });
       return await handleResponse(response);
     } catch (error) {
@@ -611,5 +599,5 @@ const api = {
   instructor: instructorAPI
 };
 
-export { apiFetch, getAuthHeaders };
+export { apiFetch };
 export default api;

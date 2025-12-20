@@ -17,27 +17,27 @@ export const AuthProvider = ({ children }) => {
   const [sessionChecked, setSessionChecked] = useState(false);
 
   useEffect(() => {
-    const validateSession = async () => {
-      if (user) {
-        try {
-          const response = await apiFetch(`${API_BASE_URL}/api/auth/validate`);
+    const checkSession = async () => {
+      try {
+        const response = await apiFetch(`${API_BASE_URL}/api/auth/session`);
+        if (response.ok) {
           const data = await response.json();
-          if (!response.ok || !data.valid) {
-            // Token invalid, clear local storage
-            setUser(null);
-            localStorage.removeItem("user");
-            localStorage.removeItem('token');
-          }
-        } catch (error) {
-          // Backend not available or token invalid
-          console.warn('Token validation failed:', error);
+          setUser(data.user);
+          localStorage.setItem("user", JSON.stringify(data.user));
+        } else {
+          setUser(null);
+          localStorage.removeItem("user");
         }
+      } catch (error) {
+        console.warn('Session check failed:', error);
+        setUser(null);
+        localStorage.removeItem("user");
       }
       setSessionChecked(true);
     };
 
-    validateSession();
-  }, [user]);
+    checkSession();
+  }, []);
 
   const login = (userData) => {
     const cleanUser = { ...userData };
@@ -48,7 +48,6 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = async () => {
-    // Best-effort notify server (JWT logout is client-side) and clear local data
     try {
       await authAPI.logout();
     } catch (err) {
@@ -57,7 +56,6 @@ export const AuthProvider = ({ children }) => {
 
     setUser(null);
     localStorage.removeItem("user");
-    localStorage.removeItem('token');
   };
 
   return (

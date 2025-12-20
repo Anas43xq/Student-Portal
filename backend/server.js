@@ -1,7 +1,7 @@
 const express = require("express");
 const mysql = require("mysql2");
 const bcrypt = require("bcryptjs");
-const jwt = require("jsonwebtoken");
+const session = require('express-session');
 const bodyParser = require("body-parser");
 const cors = require("cors");
 const path = require('path');
@@ -17,7 +17,22 @@ app.use(cors({
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-const jwtSecret = process.env.JWT_SECRET || 'your-jwt-secret-key';
+if (process.env.TRUST_PROXY === '1') {
+  // When running behind a proxy (e.g., Render), trust the first proxy so secure cookies work
+  app.set('trust proxy', 1);
+}
+
+// Session configuration
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'your-session-secret-key',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax'
+  }
+}));
 
 const db = mysql.createPool({
   host: process.env.DB_HOST || 'localhost',
@@ -39,31 +54,22 @@ db.getConnection((err, connection) => {
   connection.release();
 });
 
-const authenticateToken = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-
-  if (!token) {
-    return res.status(401).json({ message: "Access token required" });
+// Session-based auth middleware
+const requireAuth = (req, res, next) => {
+  if (!req.session || !req.session.user) {
+    return res.status(401).json({ message: "Authentication required" });
   }
-
-  jwt.verify(token, jwtSecret, (err, user) => {
-    if (err) {
-      return res.status(403).json({ message: "Invalid or expired token" });
-    }
-    req.user = user;
-    next();
-  });
-};
-
-const requireAdmin = (req, res, next) => {
-  if (!req.user || req.user.role !== 'Admin') {
-    return res.status(403).json({ message: "Admin access required" });
-  }
+  req.user = req.session.user;
   next();
 };
 
-const requireAuth = authenticateToken;
+const requireAdmin = (req, res, next) => {
+  if (!req.session || !req.session.user || req.session.user.role !== 'Admin') {
+    return res.status(403).json({ message: "Admin access required" });
+  }
+  req.user = req.session.user;
+  next();
+};
 
 app.post("/register", async (req, res) => {
   try {
@@ -163,13 +169,7 @@ app.post("/login", async (req, res) => {
           return res.status(401).json({ message: "Invalid credentials" });
         }
 
-        // Create JWT token
-        const tokenPayload = {
-          id: user.id,
-          username: user.username,
-          role: user.role
-        };
-
+        // Create session-based authentication
         if (user.role === 'Student') {
           db.query(
             "SELECT * FROM Students WHERE userId = ?",
@@ -187,37 +187,36 @@ app.post("/login", async (req, res) => {
 
               console.log('Login successful for student. UserId:', user.id, 'StudentId:', studentResults[0].id);
 
-              const token = jwt.sign({ ...tokenPayload, studentId: studentResults[0].id }, jwtSecret, { expiresIn: '24h' });
+              // Save user info in session
+              req.session.user = {
+                id: user.id,
+                username: user.username,
+                email: user.email,
+                role: user.role,
+                firstName: user.firstName,
+                lastName: user.lastName,
+                studentId: studentResults[0].id
+              };
 
               res.json({
                 message: "Login successful",
-                token: token,
-                user: {
-                  id: user.id,
-                  username: user.username,
-                  email: user.email,
-                  role: user.role,
-                  firstName: user.firstName,
-                  lastName: user.lastName,
-                  studentId: studentResults[0].id
-                }
+                user: req.session.user
               });
             }
           );
         } else {
-          const token = jwt.sign(tokenPayload, jwtSecret, { expiresIn: '24h' });
+          req.session.user = {
+            id: user.id,
+            username: user.username,
+            email: user.email,
+            role: user.role,
+            firstName: user.firstName,
+            lastName: user.lastName
+          };
 
           res.json({
             message: "Login successful",
-            token: token,
-            user: {
-              id: user.id,
-              username: user.username,
-              email: user.email,
-              role: user.role,
-              firstName: user.firstName,
-              lastName: user.lastName
-            }
+            user: req.session.user
           });
         }
       }
@@ -229,15 +228,24 @@ app.post("/login", async (req, res) => {
 });
 
 app.post("/logout", (req, res) => {
-  // For JWT, logout is handled on the client side by removing the token
-  res.json({ message: "Logout successful" });
+  // Destroy session and clear cookie
+  req.session.destroy((err) => {
+    if (err) {
+      console.error('Error destroying session during logout:', err);
+      return res.status(500).json({ message: 'Logout failed' });
+    }
+
+    // Clear session cookie (default name is connect.sid)
+    res.clearCookie('connect.sid');
+    res.json({ message: "Logout successful" });
+  });
 });
 
-app.get("/api/auth/validate", authenticateToken, (req, res) => {
+app.get("/api/auth/validate", requireAuth, (req, res) => {
   res.json({ valid: true, user: req.user });
 });
 
-app.get("/api/auth/session", authenticateToken, (req, res) => {
+app.get("/api/auth/session", requireAuth, (req, res) => {
   res.json({
     isAuthenticated: true,
     user: req.user
