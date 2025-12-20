@@ -25,8 +25,12 @@ param(
 )
 
 function Exec-Git {
-    param([string]$Args)
-    git $Args
+    param(
+        [Parameter(ValueFromRemainingArguments=$true)]
+        [string[]]$Args
+    )
+    # Call git with the provided tokens so quoted strings remain intact when passed as a single parameter
+    & git @Args
     if ($LASTEXITCODE -ne 0) {
         throw "git $Args failed with exit code $LASTEXITCODE"
     }
@@ -47,8 +51,8 @@ try {
 
         if ($Message) {
             Write-Output "Committing changes with message: $Message"
-            Exec-Git "add -A"
-            Exec-Git "commit -m `"$Message`""
+            Exec-Git 'add' '-A'
+            Exec-Git 'commit' '-m' $Message
         } else {
             Write-Output "Skipping commit as no message provided. Proceeding to push existing commits."
         }
@@ -57,14 +61,14 @@ try {
     }
 
     Write-Output "Pushing 'main' to origin..."
-    Exec-Git "push origin main"
+    Exec-Git 'push' 'origin' 'main'
 
     if ($Force.IsPresent) {
         Write-Output "Updating 'chore/remove-stale-docs' from 'main' using --force"
-        Exec-Git "push origin main:chore/remove-stale-docs --force"
+        Exec-Git 'push' 'origin' 'main:chore/remove-stale-docs' '--force'
     } else {
         Write-Output "Updating 'chore/remove-stale-docs' from 'main' using --force-with-lease"
-        Exec-Git "push origin main:chore/remove-stale-docs --force-with-lease"
+        Exec-Git 'push' 'origin' 'main:chore/remove-stale-docs' '--force-with-lease'
     }
 
     Write-Output "Done. Remote branches updated."
