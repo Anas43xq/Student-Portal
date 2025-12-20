@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 
+const API_BASE_URL = 'https://student-portal-owa4.onrender.com';
+
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
@@ -17,7 +19,7 @@ export const AuthProvider = ({ children }) => {
     const validateSession = async () => {
       if (user) {
         try {
-          const response = await fetch('http://localhost:5000/api/auth/validate', {
+          const response = await fetch(`${API_BASE_URL}/api/auth/validate`, {
             credentials: 'include'
           });
           
