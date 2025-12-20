@@ -93,7 +93,8 @@ const generateToken = (user) => {
       role: user.role,
       firstName: user.firstName,
       lastName: user.lastName,
-      studentId: user.studentId
+      studentId: user.studentId,
+      instructorId: user.instructorId
     },
     JWT_SECRET,
     { expiresIn: '24h' }
@@ -216,6 +217,40 @@ app.post("/login", async (req, res) => {
                 firstName: user.firstName,
                 lastName: user.lastName,
                 studentId: studentResults[0].id
+              };
+
+              const token = generateToken(userData);
+
+              res.json({
+                message: "Login successful",
+                token: token,
+                user: userData
+              });
+            }
+          );
+        } else if (user.role === 'Instructor') {
+          db.query(
+            "SELECT * FROM Instructors WHERE userId = ?",
+            [user.id],
+            (err, instructorResults) => {
+              if (err) {
+                console.error('Error fetching instructor record:', err);
+                return res.status(500).json({ message: "Error fetching instructor data" });
+              }
+
+              if (!instructorResults || instructorResults.length === 0) {
+                console.error('No instructor record found for userId:', user.id);
+                return res.status(500).json({ message: "Instructor record not found. Please contact administrator." });
+              }
+
+              const userData = {
+                id: user.id,
+                username: user.username,
+                email: user.email,
+                role: user.role,
+                firstName: user.firstName,
+                lastName: user.lastName,
+                instructorId: instructorResults[0].id
               };
 
               const token = generateToken(userData);
@@ -2011,53 +2046,45 @@ app.get("/api/student/quiz-submissions", requireAuth, (req, res) => {
 });
 
 app.get("/api/instructor/quiz-results", requireAuth, (req, res) => {
-  const userId = req.user.id;
+  const instructorId = req.user.instructorId;
   const { quizId, courseId } = req.query;
 
-  db.query(
-    "SELECT id FROM Instructors WHERE userId = ?",
-    [userId],
-    (err, instructorResults) => {
-      if (err || instructorResults.length === 0) {
-        return res.status(400).json({ message: "Instructor record not found" });
-      }
+  if (!instructorId) {
+    return res.status(400).json({ message: "Instructor ID not found in token" });
+  }
 
-      const instructorId = instructorResults[0].id;
+  let query = `
+    SELECT qs.*, q.title, q.courseId, c.name as courseName, s.id as studentId, u.firstName, u.lastName
+    FROM QuizSubmissions qs
+    JOIN Quizzes q ON qs.quizId = q.id
+    JOIN Courses c ON q.courseId = c.id
+    JOIN Students s ON qs.studentId = s.id
+    JOIN Users u ON s.userId = u.id
+    JOIN CourseInstructors ci ON c.id = ci.courseId
+    WHERE ci.instructorId = ?
+  `;
+  const params = [instructorId];
 
-      let query = `
-        SELECT qs.*, q.title, q.courseId, c.name as courseName, s.id as studentId, u.firstName, u.lastName
-        FROM QuizSubmissions qs
-        JOIN Quizzes q ON qs.quizId = q.id
-        JOIN Courses c ON q.courseId = c.id
-        JOIN Students s ON qs.studentId = s.id
-        JOIN Users u ON s.userId = u.id
-        JOIN CourseInstructors ci ON c.id = ci.courseId
-        WHERE ci.instructorId = ?
-      `;
-      const params = [instructorId];
+  if (quizId) {
+    query += ` AND q.id = ?`;
+    params.push(quizId);
+  }
 
-      if (quizId) {
-        query += ` AND q.id = ?`;
-        params.push(quizId);
-      }
+  if (courseId) {
+    query += ` AND c.id = ?`;
+    params.push(courseId);
+  }
 
-      if (courseId) {
-        query += ` AND c.id = ?`;
-        params.push(courseId);
-      }
+  query += ` ORDER BY qs.submittedAt DESC`;
 
-      query += ` ORDER BY qs.submittedAt DESC`;
-
-      db.query(query, params, (err, results) => {
-        if (err) {
-          console.error(err);
-          return res.status(500).json({ message: "Database error" });
-        }
-
-        res.json({ results: results || [] });
-      });
+  db.query(query, params, (err, results) => {
+    if (err) {
+      console.error(err);
+      return res.status(500).json({ message: "Database error" });
     }
-  );
+
+    res.json({ results: results || [] });
+  });
 });
 
 app.get("/api/instructor/stats", requireAuth, (req, res) => {
