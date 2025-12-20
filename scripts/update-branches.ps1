@@ -1,10 +1,10 @@
 <#
 .SYNOPSIS
-  Update remote branches by pushing `main` and syncing to `chore/remove-stale-docs`.
+  Update remote branches by pushing `main` and syncing to `ProjectPub`.
 
 .DESCRIPTION
   Commits working-tree changes (if a commit message is provided), pushes `main`, and then updates
-  `chore/remove-stale-docs` to match `main` using `--force-with-lease` (or `--force` with -Force).
+  `ProjectPub` to match `main` using `--force-with-lease` (or `--force` with -Force).
 
 .PARAMETER Message
   Commit message to use for committing staged/unstaged changes. If omitted and there are changes,
@@ -64,11 +64,11 @@ try {
     Exec-Git 'push' 'origin' 'main'
 
     if ($Force.IsPresent) {
-        Write-Output "Updating 'chore/remove-stale-docs' from 'main' using --force"
-        Exec-Git 'push' 'origin' 'main:chore/remove-stale-docs' '--force'
+        Write-Output "Updating 'ProjectPub' from 'main' using --force"
+        Exec-Git 'push' 'origin' 'main:ProjectPub' '--force'
     } else {
-        Write-Output "Updating 'chore/remove-stale-docs' from 'main' using --force-with-lease"
-        Exec-Git 'push' 'origin' 'main:chore/remove-stale-docs' '--force-with-lease'
+        Write-Output "Updating 'ProjectPub' from 'main' using --force-with-lease"
+        Exec-Git 'push' 'origin' 'main:ProjectPub' '--force-with-lease'
     }
 
     Write-Output "Done. Remote branches updated."
