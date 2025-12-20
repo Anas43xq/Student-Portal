@@ -27,8 +27,8 @@ function LoginPage() {
     try {
       const data = await authAPI.login(username, password);
       
-      if (data.user) {
-        login(data.user);
+      if (data.user && data.token) {
+        login({ token: data.token, user: data.user });
 
       }
     } catch (err) {
