@@ -886,10 +886,22 @@ app.post("/api/enrollments", requireAuth, (req, res) => {
 
                   console.log('Enrollment created successfully. ID:', result.insertId);
 
-                  res.status(201).json({
-                    message: "Enrollment created successfully",
-                    enrollmentId: result.insertId
-                  });
+                  // Increment currentEnrollment in Courses table
+                  db.query(
+                    "UPDATE Courses SET currentEnrollment = currentEnrollment + 1 WHERE id = ?",
+                    [courseId],
+                    (updateErr) => {
+                      if (updateErr) {
+                        console.error('Failed to update course enrollment count:', updateErr);
+                        // Don't fail the enrollment creation, just log the error
+                      }
+
+                      res.status(201).json({
+                        message: "Enrollment created successfully",
+                        enrollmentId: result.insertId
+                      });
+                    }
+                  );
                 }
               );
             }
@@ -908,16 +920,66 @@ app.put("/api/enrollments/:id", requireAuth, (req, res) => {
     return res.status(403).json({ message: "Only admins can update enrollments" });
   }
 
+  // First, get the current enrollment status to check if it's changing to 'Completed'
   db.query(
-    "UPDATE Enrollments SET grade = ?, status = ? WHERE id = ?",
-    [grade, status, id],
-    (err) => {
+    "SELECT status, studentId, courseId FROM Enrollments WHERE id = ?",
+    [id],
+    (err, currentResult) => {
       if (err) {
         console.error(err);
-        return res.status(500).json({ message: "Failed to update enrollment" });
+        return res.status(500).json({ message: "Database error" });
       }
 
-      res.json({ message: "Enrollment updated successfully" });
+      if (currentResult.length === 0) {
+        return res.status(404).json({ message: "Enrollment not found" });
+      }
+
+      const currentStatus = currentResult[0].status;
+      const studentId = currentResult[0].studentId;
+      const courseId = currentResult[0].courseId;
+
+      db.query(
+        "UPDATE Enrollments SET grade = ?, status = ? WHERE id = ?",
+        [grade, status, id],
+        (err) => {
+          if (err) {
+            console.error(err);
+            return res.status(500).json({ message: "Failed to update enrollment" });
+          }
+
+          // If status changed to 'Completed' and wasn't before, add credits to student
+          if (status === 'Completed' && currentStatus !== 'Completed') {
+            db.query(
+              "SELECT credits FROM Courses WHERE id = ?",
+              [courseId],
+              (err, courseResult) => {
+                if (err) {
+                  console.error('Failed to get course credits:', err);
+                  return res.json({ message: "Enrollment updated successfully" });
+                }
+
+                if (courseResult.length > 0) {
+                  const credits = courseResult[0].credits;
+                  db.query(
+                    "UPDATE Students SET totalCredits = totalCredits + ? WHERE id = ?",
+                    [credits, studentId],
+                    (updateErr) => {
+                      if (updateErr) {
+                        console.error('Failed to update student credits:', updateErr);
+                      }
+                      res.json({ message: "Enrollment updated successfully" });
+                    }
+                  );
+                } else {
+                  res.json({ message: "Enrollment updated successfully" });
+                }
+              }
+            );
+          } else {
+            res.json({ message: "Enrollment updated successfully" });
+          }
+        }
+      );
     }
   );
 });
@@ -929,16 +991,46 @@ app.delete("/api/enrollments/:id", requireAuth, (req, res) => {
     return res.status(403).json({ message: "Only admins can delete enrollments" });
   }
 
+  // First, get the courseId for the enrollment to decrement currentEnrollment
   db.query(
-    "DELETE FROM Enrollments WHERE id = ?",
+    "SELECT courseId FROM Enrollments WHERE id = ?",
     [id],
-    (err) => {
+    (err, result) => {
       if (err) {
         console.error(err);
-        return res.status(500).json({ message: "Failed to delete enrollment" });
+        return res.status(500).json({ message: "Database error" });
       }
 
-      res.json({ message: "Enrollment deleted successfully" });
+      if (result.length === 0) {
+        return res.status(404).json({ message: "Enrollment not found" });
+      }
+
+      const courseId = result[0].courseId;
+
+      db.query(
+        "DELETE FROM Enrollments WHERE id = ?",
+        [id],
+        (err) => {
+          if (err) {
+            console.error(err);
+            return res.status(500).json({ message: "Failed to delete enrollment" });
+          }
+
+          // Decrement currentEnrollment in Courses table if > 0
+          db.query(
+            "UPDATE Courses SET currentEnrollment = GREATEST(currentEnrollment - 1, 0) WHERE id = ?",
+            [courseId],
+            (updateErr) => {
+              if (updateErr) {
+                console.error('Failed to update course enrollment count:', updateErr);
+                // Don't fail the enrollment deletion, just log the error
+              }
+
+              res.json({ message: "Enrollment deleted successfully" });
+            }
+          );
+        }
+      );
     }
   );
 });
