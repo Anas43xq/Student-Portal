@@ -17,6 +17,8 @@ Thumbs.db
 
 # Environment
 .env
+# Local backend env file (contains secrets - ignore)
+backend/Configurations.env
 
 # IDE
 .vscode/
@@ -24,9 +26,3 @@ Thumbs.db
 
 # GitHub Pages branch locally
 gh-pages/
-
-# Backend local environment (ignored)
-backend/config.env
-
-# Keep example config in repo
-backend/config.env.example

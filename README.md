@@ -16,3 +16,8 @@ This repository contains the Student Portal frontend (React) and backend (Node.j
   - npm install
   - npm run build
 
+## Environment variables & secrets 🔐
+- The backend reads configuration from environment variables (see `backend/.env.example`).
+- **Do not commit real secrets** (DB passwords, API keys, JWT secret) to the repository. `backend/Configurations.env` is a local env file and is now ignored by git.
+- Add `JWT_SECRET` to your environment (recommended) or set it in a local `Configurations.env` for development. If you've previously committed secrets, rotate them immediately.
+
