@@ -1,36 +1,23 @@
 const express = require("express");
 const mysql = require("mysql2");
 const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
 const bodyParser = require("body-parser");
 const cors = require("cors");
-const session = require("express-session");
 const path = require('path');
 const envPath = path.join(__dirname, 'Configurations.env');
 require('dotenv').config({ path: envPath });
 
 const app = express();
 
-app.use(cors({ 
+app.use(cors({
   origin: process.env.CORS_ORIGIN,
-  credentials: true 
+  credentials: true
 }));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-const sessionSecret = process.env.SESSION_SECRET || 'dev-local-session-secret';
-const isProduction = process.env.NODE_ENV === 'production' || process.env.CORS_ORIGIN;
-
-app.use(session({
-  secret: sessionSecret,
-  resave: false,
-  saveUninitialized: false,
-  cookie: {
-    secure: isProduction,
-    httpOnly: true,
-    sameSite: isProduction ? 'none' : 'lax',
-    maxAge: 24 * 60 * 60 * 1000 // 24 hours
-  }
-}));
+const jwtSecret = process.env.JWT_SECRET || 'your-jwt-secret-key';
 
 const db = mysql.createPool({
   host: process.env.DB_HOST || 'localhost',
@@ -52,19 +39,31 @@ db.getConnection((err, connection) => {
   connection.release();
 });
 
-const requireAuth = (req, res, next) => {
-  if (!req.session.userId) {
-    return res.status(401).json({ message: "Unauthorized - Please login" });
+const authenticateToken = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ message: "Access token required" });
+  }
+
+  jwt.verify(token, jwtSecret, (err, user) => {
+    if (err) {
+      return res.status(403).json({ message: "Invalid or expired token" });
+    }
+    req.user = user;
+    next();
+  });
+};
+
+const requireAdmin = (req, res, next) => {
+  if (!req.user || req.user.role !== 'Admin') {
+    return res.status(403).json({ message: "Admin access required" });
   }
   next();
 };
 
-const requireAdmin = (req, res, next) => {
-  if (!req.session.userId || req.session.role !== 'Admin') {
-    return res.status(403).json({ message: "Forbidden - Admin access required" });
-  }
-  next();
-};
+const requireAuth = authenticateToken;
 
 app.post("/register", async (req, res) => {
   try {
@@ -151,8 +150,8 @@ app.post("/login", async (req, res) => {
         const user = results[0];
 
         if (user.isBanned) {
-          return res.status(403).json({ 
-            message: "Account has been banned", 
+          return res.status(403).json({
+            message: "Account has been banned",
             reason: user.banReason || "No reason provided",
             bannedAt: user.bannedAt
           });
@@ -164,9 +163,12 @@ app.post("/login", async (req, res) => {
           return res.status(401).json({ message: "Invalid credentials" });
         }
 
-        req.session.userId = user.id;
-        req.session.username = user.username;
-        req.session.role = user.role;
+        // Create JWT token
+        const tokenPayload = {
+          id: user.id,
+          username: user.username,
+          role: user.role
+        };
 
         if (user.role === 'Student') {
           db.query(
@@ -185,8 +187,11 @@ app.post("/login", async (req, res) => {
 
               console.log('Login successful for student. UserId:', user.id, 'StudentId:', studentResults[0].id);
 
+              const token = jwt.sign({ ...tokenPayload, studentId: studentResults[0].id }, jwtSecret, { expiresIn: '24h' });
+
               res.json({
                 message: "Login successful",
+                token: token,
                 user: {
                   id: user.id,
                   username: user.username,
@@ -200,8 +205,11 @@ app.post("/login", async (req, res) => {
             }
           );
         } else {
+          const token = jwt.sign(tokenPayload, jwtSecret, { expiresIn: '24h' });
+
           res.json({
             message: "Login successful",
+            token: token,
             user: {
               id: user.id,
               username: user.username,
@@ -221,36 +229,19 @@ app.post("/login", async (req, res) => {
 });
 
 app.post("/logout", (req, res) => {
-  req.session.destroy((err) => {
-    if (err) {
-      return res.status(500).json({ message: "Logout failed" });
-    }
-    res.clearCookie('sessionId');
-    res.json({ message: "Logout successful" });
+  // For JWT, logout is handled on the client side by removing the token
+  res.json({ message: "Logout successful" });
+});
+
+app.get("/api/auth/validate", authenticateToken, (req, res) => {
+  res.json({ valid: true, user: req.user });
+});
+
+app.get("/api/auth/session", authenticateToken, (req, res) => {
+  res.json({
+    isAuthenticated: true,
+    user: req.user
   });
-});
-
-app.get("/api/auth/validate", (req, res) => {
-  if (req.session && req.session.userId) {
-    res.json({ valid: true, userId: req.session.userId });
-  } else {
-    res.status(401).json({ valid: false, message: "No active session" });
-  }
-});
-
-app.get("/api/auth/session", (req, res) => {
-  if (req.session.userId) {
-    res.json({
-      isAuthenticated: true,
-      user: {
-        id: req.session.userId,
-        username: req.session.username,
-        role: req.session.role
-      }
-    });
-  } else {
-    res.json({ isAuthenticated: false });
-  }
 });
 
 // ============================================
@@ -309,20 +300,20 @@ app.get("/api/students", requireAdmin, (req, res) => {
 app.get("/api/students/:id", requireAuth, (req, res) => {
   const { id } = req.params;
 
-  console.log('GET /api/students/:id - Session:', { userId: req.session.userId, role: req.session.role }, 'Requested ID:', id);
+  console.log('GET /api/students/:id - User:', { userId: req.user.id, role: req.user.role }, 'Requested ID:', id);
 
-  if (req.session.role === 'Student') {
+  if (req.user.role === 'Student') {
     db.query(
       "SELECT id FROM Students WHERE userId = ?",
-      [req.session.userId],
+      [req.user.id],
       (err, results) => {
         if (err) {
-          console.error('Error fetching student for userId:', req.session.userId, err);
+          console.error('Error fetching student for userId:', req.user.id, err);
           return res.status(500).json({ message: "Database error" });
         }
-        
+
         if (results.length === 0) {
-          console.error('No student record found for userId:', req.session.userId);
+          console.error('No student record found for userId:', req.user.id);
           return res.status(403).json({ message: "Access denied - No student record found" });
         }
         
@@ -466,8 +457,8 @@ app.post("/api/students", requireAdmin, async (req, res) => {
             }
 
             logActivity(
-              req.session.userId,
-              req.session.username,
+              req.user.id,
+              req.user.username,
               'CREATE',
               'Student',
               studentResult.insertId,
@@ -569,8 +560,8 @@ app.delete("/api/students/:id", requireAdmin, (req, res) => {
           }
 
           logActivity(
-            req.session.userId,
-            req.session.username,
+            req.user && req.user.id,
+            req.user && req.user.username,
             'DELETE',
             'Student',
             id,
@@ -680,8 +671,8 @@ app.post("/api/courses", requireAdmin, (req, res) => {
       }
 
       logActivity(
-        req.session.userId,
-        req.session.username,
+        req.user && req.user.id,
+        req.user && req.user.username,
         'CREATE',
         'Course',
         result.insertId,
@@ -711,8 +702,8 @@ app.put("/api/courses/:id", requireAdmin, (req, res) => {
       }
 
       logActivity(
-        req.session.userId,
-        req.session.username,
+        req.user && req.user.id,
+        req.user && req.user.username,
         'UPDATE',
         'Course',
         id,
@@ -746,8 +737,8 @@ app.delete("/api/courses/:id", requireAdmin, (req, res) => {
         }
 
         logActivity(
-          req.session.userId,
-          req.session.username,
+          req.user && req.user.id,
+          req.user && req.user.username,
           'DELETE',
           'Course',
           id,
@@ -776,10 +767,10 @@ app.get("/api/enrollments", requireAuth, (req, res) => {
   `;
   const params = [];
 
-  if (req.session.role === 'Student') {
+  if (req.user.role === 'Student') {
     db.query(
       "SELECT id FROM Students WHERE userId = ?",
-      [req.session.userId],
+      [req.user.id],
       (err, results) => {
         if (err || results.length === 0) {
           return res.status(403).json({ message: "Access denied" });
@@ -825,7 +816,7 @@ function executeEnrollmentQuery(query, params, status, res) {
 app.post("/api/enrollments", requireAuth, (req, res) => {
   const { studentId, courseId, semester, year } = req.body;
 
-  console.log('POST /api/enrollments - Request:', { studentId, courseId, semester, year, userId: req.session.userId });
+  console.log('POST /api/enrollments - Request:', { studentId, courseId, semester, year, userId: req.user && req.user.id });
 
   if (!studentId || !courseId || !semester || !year) {
     return res.status(400).json({ message: "Required fields missing" });
@@ -918,7 +909,7 @@ app.put("/api/enrollments/:id", requireAuth, (req, res) => {
   const { id } = req.params;
   const { grade, status } = req.body;
 
-  if (req.session.role !== 'Admin') {
+  if (!req.user || req.user.role !== 'Admin') {
     return res.status(403).json({ message: "Only admins can update enrollments" });
   }
 
@@ -989,7 +980,7 @@ app.put("/api/enrollments/:id", requireAuth, (req, res) => {
 app.delete("/api/enrollments/:id", requireAuth, (req, res) => {
   const { id } = req.params;
 
-  if (req.session.role !== 'Admin') {
+  if (!req.user || req.user.role !== 'Admin') {
     return res.status(403).json({ message: "Only admins can delete enrollments" });
   }
 
@@ -1118,15 +1109,15 @@ app.post("/api/admin/users", requireAdmin, async (req, res) => {
             }
 
             const fullName = `${firstName || ''} ${lastName || ''}`.trim() || username;
-            logActivity(
-              req.session.userId,
-              req.session.username,
-              'CREATE',
-              'User',
-              result.insertId,
-              fullName,
-              `Created new ${role} user: ${username}`
-            );
+                      logActivity(
+                        req.user && req.user.id,
+                        req.user && req.user.username,
+                        'CREATE',
+                        'User',
+                        result.insertId,
+                        fullName,
+                        `Created new ${role} user: ${username}`
+                      );
 
             res.status(201).json({
               message: "User created successfully",
@@ -1145,7 +1136,7 @@ app.post("/api/admin/users", requireAdmin, async (req, res) => {
 app.post("/api/admin/users/:id/ban", requireAdmin, (req, res) => {
   const { id } = req.params;
   const { reason } = req.body;
-  const bannedBy = req.session.userId;
+  const bannedBy = req.user && req.user.id;
 
   if (id == bannedBy) {
     return res.status(400).json({ message: "Cannot ban yourself" });
@@ -1203,7 +1194,7 @@ app.post("/api/admin/users/:id/unban", requireAdmin, (req, res) => {
 
 app.delete("/api/admin/users/:id", requireAdmin, (req, res) => {
   const { id } = req.params;
-  const adminId = req.session.userId;
+  const adminId = req.user && req.user.id;
 
   if (parseInt(id) === adminId) {
     return res.status(400).json({ message: "Cannot delete your own account" });
@@ -1233,8 +1224,8 @@ app.delete("/api/admin/users/:id", requireAdmin, (req, res) => {
       }
 
       logActivity(
-        req.session.userId,
-        req.session.username,
+        req.user && req.user.id,
+        req.user && req.user.username,
         'DELETE',
         'User',
         id,
@@ -1365,10 +1356,10 @@ app.get("/api/students/:id/instructors", requireAuth, (req, res) => {
   const { id } = req.params;
 
   // Students can only view their own instructors
-  if (req.session.role === 'Student') {
+  if (req.user && req.user.role === 'Student') {
     db.query(
       "SELECT id FROM Students WHERE userId = ?",
-      [req.session.userId],
+      [req.user.id],
       (err, results) => {
         if (err || results.length === 0 || results[0].id != id) {
           return res.status(403).json({ message: "Access denied" });
@@ -1417,10 +1408,10 @@ app.get("/api/instructors/:id/students", requireAuth, (req, res) => {
   const { courseId } = req.query;
 
   // Instructors can only view their own students
-  if (req.session.role === 'Instructor') {
+  if (req.user && req.user.role === 'Instructor') {
     db.query(
       "SELECT id FROM Instructors WHERE userId = ?",
-      [req.session.userId],
+      [req.user.id],
       (err, results) => {
         if (err || results.length === 0 || results[0].id != id) {
           return res.status(403).json({ message: "Access denied" });
@@ -1491,8 +1482,8 @@ app.delete("/api/instructors/:id", requireAdmin, (req, res) => {
 
 app.get("/api/quizzes", requireAuth, (req, res) => {
   const { courseId } = req.query;
-  const userId = req.session.userId;
-  const userRole = req.session.role;
+  const userId = req.user && req.user.id;
+  const userRole = req.user && req.user.role;
 
   if (userRole === 'Admin') {
     let query = "SELECT * FROM Quizzes WHERE 1=1";
@@ -1619,7 +1610,7 @@ app.delete("/api/quizzes/:id", requireAdmin, (req, res) => {
 
 app.get("/api/quizzes/:id/questions", requireAuth, (req, res) => {
   const { id } = req.params;
-  const userRole = req.session.role;
+  const userRole = req.user && req.user.role;
 
   let selectFields = "id, questionText, points";
   if (userRole === 'Admin' || userRole === 'Instructor') {
@@ -1835,7 +1826,7 @@ app.get("/api/instructor/student-answers/:quizId/:studentId", requireAuth, (req,
 app.post("/api/quizzes/:id/submit", requireAuth, (req, res) => {
   const { id } = req.params;
   const { answers } = req.body;
-  const userId = req.session.userId;
+  const userId = req.user && req.user.id;
 
   db.query("SELECT id FROM Students WHERE userId = ?", [userId], (err, studentResult) => {
     if (err || studentResult.length === 0) {
@@ -1911,7 +1902,7 @@ app.post("/api/quizzes/:id/submit", requireAuth, (req, res) => {
 });
 
 app.get("/api/student/quiz-submissions", requireAuth, (req, res) => {
-  const userId = req.session.userId;
+  const userId = req.user && req.user.id;
 
   db.query("SELECT id FROM Students WHERE userId = ?", [userId], (err, studentResult) => {
     if (err || studentResult.length === 0) {
@@ -1956,7 +1947,7 @@ app.get("/api/student/quiz-submissions", requireAuth, (req, res) => {
 
 app.get("/api/quizzes/:id/my-answers", requireAuth, (req, res) => {
   const { id } = req.params;
-  const userId = req.session.userId;
+  const userId = req.user && req.user.id;
 
   db.query("SELECT id FROM Students WHERE userId = ?", [userId], (err, studentResult) => {
     if (err || studentResult.length === 0) {
@@ -1981,8 +1972,8 @@ app.get("/api/quizzes/:id/my-answers", requireAuth, (req, res) => {
 
 app.get("/api/instructor/quiz-results", requireAuth, (req, res) => {
   const { quizId, courseId, instructorId } = req.query;
-  const userRole = req.session.role;
-  const userId = req.session.userId;
+  const userRole = req.user && req.user.role;
+  const userId = req.user && req.user.id;
   
   let query = `
     SELECT 
@@ -2059,7 +2050,7 @@ app.get("/api/instructor/quiz-results", requireAuth, (req, res) => {
 // ============================================
 
 app.get("/api/instructor/stats", requireAuth, (req, res) => {
-  const userId = req.session.userId;
+  const userId = req.user && req.user.id;
   
 
   db.query("SELECT id FROM instructors WHERE userId = ?", [userId], (err, instructorResult) => {
