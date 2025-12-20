@@ -1535,6 +1535,531 @@ app.get("/api/quizzes", requireAuth, (req, res) => {
   }
 });
 
+// Quiz endpoints
+app.post("/api/quizzes", requireAuth, (req, res) => {
+  const { courseId, title, description, dueDate, totalPoints } = req.body;
+
+  if (!courseId || !title || !totalPoints) {
+    return res.status(400).json({ message: "Course, title, and totalPoints are required" });
+  }
+
+  db.query(
+    "INSERT INTO Quizzes (courseId, title, description, dueDate, totalPoints) VALUES (?, ?, ?, ?, ?)",
+    [courseId, title, description || null, dueDate || null, totalPoints],
+    (err, result) => {
+      if (err) {
+        console.error(err);
+        return res.status(500).json({ message: "Failed to create quiz", error: err.message });
+      }
+
+      res.status(201).json({
+        message: "Quiz created successfully",
+        quizId: result.insertId
+      });
+    }
+  );
+});
+
+app.put("/api/quizzes/:id", requireAuth, (req, res) => {
+  const { id } = req.params;
+  const { title, description, dueDate, totalPoints } = req.body;
+
+  db.query(
+    "UPDATE Quizzes SET title = ?, description = ?, dueDate = ?, totalPoints = ? WHERE id = ?",
+    [title, description, dueDate, totalPoints, id],
+    (err) => {
+      if (err) {
+        console.error(err);
+        return res.status(500).json({ message: "Failed to update quiz", error: err.message });
+      }
+
+      res.json({ message: "Quiz updated successfully" });
+    }
+  );
+});
+
+app.delete("/api/quizzes/:id", requireAuth, (req, res) => {
+  const { id } = req.params;
+
+  db.query(
+    "DELETE FROM Quizzes WHERE id = ?",
+    [id],
+    (err) => {
+      if (err) {
+        console.error(err);
+        return res.status(500).json({ message: "Failed to delete quiz" });
+      }
+
+      res.json({ message: "Quiz deleted successfully" });
+    }
+  );
+});
+
+// Quiz Questions endpoints
+app.get("/api/quizzes/:id/questions", requireAuth, (req, res) => {
+  const { id } = req.params;
+
+  db.query(
+    "SELECT * FROM QuizQuestions WHERE quizId = ? ORDER BY id",
+    [id],
+    (err, results) => {
+      if (err) {
+        console.error(err);
+        return res.status(500).json({ message: "Database error" });
+      }
+
+      res.json({ questions: results || [] });
+    }
+  );
+});
+
+app.post("/api/quizzes/:id/questions", requireAuth, (req, res) => {
+  const { id } = req.params;
+  const { questionText, correctAnswer, points } = req.body;
+
+  if (!questionText) {
+    return res.status(400).json({ message: "Question text is required" });
+  }
+
+  db.query(
+    "INSERT INTO QuizQuestions (quizId, questionText, correctAnswer, points) VALUES (?, ?, ?, ?)",
+    [id, questionText, correctAnswer, points || 1],
+    (err, result) => {
+      if (err) {
+        console.error(err);
+        return res.status(500).json({ message: "Failed to add question", error: err.message });
+      }
+
+      res.status(201).json({
+        message: "Question added successfully",
+        questionId: result.insertId
+      });
+    }
+  );
+});
+
+app.put("/api/quizzes/:id/questions/:questionId", requireAuth, (req, res) => {
+  const { id, questionId } = req.params;
+  const { questionText, correctAnswer, points } = req.body;
+
+  db.query(
+    "UPDATE QuizQuestions SET questionText = ?, correctAnswer = ?, points = ? WHERE id = ? AND quizId = ?",
+    [questionText, correctAnswer, points, questionId, id],
+    (err) => {
+      if (err) {
+        console.error(err);
+        return res.status(500).json({ message: "Failed to update question" });
+      }
+
+      res.json({ message: "Question updated successfully" });
+    }
+  );
+});
+
+app.delete("/api/quizzes/:id/questions/:questionId", requireAuth, (req, res) => {
+  const { id, questionId } = req.params;
+
+  db.query(
+    "DELETE FROM QuizQuestions WHERE id = ? AND quizId = ?",
+    [questionId, id],
+    (err) => {
+      if (err) {
+        console.error(err);
+        return res.status(500).json({ message: "Failed to delete question" });
+      }
+
+      res.json({ message: "Question deleted successfully" });
+    }
+  );
+});
+
+// Quiz Submissions endpoints
+app.get("/api/instructor/quiz-submissions/:id", requireAuth, (req, res) => {
+  const { id } = req.params;
+
+  db.query(
+    `SELECT qs.*, s.id as studentId, u.firstName, u.lastName, u.email, q.totalPoints
+     FROM QuizSubmissions qs
+     JOIN Students s ON qs.studentId = s.id
+     JOIN Users u ON s.userId = u.id
+     JOIN Quizzes q ON qs.quizId = q.id
+     WHERE qs.quizId = ?
+     ORDER BY qs.submittedAt DESC`,
+    [id],
+    (err, results) => {
+      if (err) {
+        console.error(err);
+        return res.status(500).json({ message: "Database error" });
+      }
+
+      const submissions = results.map(sub => ({
+        submissionId: sub.id,
+        quizId: sub.quizId,
+        studentId: sub.studentId,
+        firstName: sub.firstName,
+        lastName: sub.lastName,
+        email: sub.email,
+        score: sub.score,
+        totalPoints: sub.totalPoints,
+        status: sub.score !== null ? (sub.score >= sub.totalPoints * 0.6 ? 'Pass' : 'Fail') : 'Pending',
+        submittedAt: sub.submittedAt,
+        answersCount: 0,
+        correctCount: 0
+      }));
+
+      res.json({ submissions });
+    }
+  );
+});
+
+app.get("/api/instructor/student-answers/:quizId/:studentId", requireAuth, (req, res) => {
+  const { quizId, studentId } = req.params;
+
+  db.query(
+    `SELECT qa.*, qq.questionText, qq.correctAnswer, qq.points
+     FROM QuizAnswers qa
+     JOIN QuizQuestions qq ON qa.questionId = qq.id
+     WHERE qa.quizId = ? AND qa.studentId = ?
+     ORDER BY qq.id`,
+    [quizId, studentId],
+    (err, results) => {
+      if (err) {
+        console.error(err);
+        return res.status(500).json({ message: "Database error" });
+      }
+
+      const answers = results.map(ans => ({
+        answerId: ans.id,
+        questionId: ans.questionId,
+        questionText: ans.questionText,
+        studentAnswer: ans.answer,
+        correctAnswer: ans.correctAnswer,
+        points: ans.points,
+        isCorrect: ans.answer === ans.correctAnswer ? 1 : 0
+      }));
+
+      res.json({ answers });
+    }
+  );
+});
+
+app.post("/api/quizzes/:id/submit", requireAuth, (req, res) => {
+  const { id } = req.params;
+  const { answers } = req.body;
+
+  db.query(
+    "SELECT id FROM Students WHERE userId = ?",
+    [req.user.id],
+    (err, studentResults) => {
+      if (err || studentResults.length === 0) {
+        return res.status(404).json({ message: "Student not found" });
+      }
+
+      const studentId = studentResults[0].id;
+
+      // Check if already submitted
+      db.query(
+        "SELECT id FROM QuizSubmissions WHERE quizId = ? AND studentId = ?",
+        [id, studentId],
+        (err, existingSubmissions) => {
+          const isResubmission = existingSubmissions && existingSubmissions.length > 0;
+          const submissionId = isResubmission ? existingSubmissions[0].id : null;
+
+          // Calculate score
+          let correctCount = 0;
+          const answerPromises = answers.map(answer => {
+            return new Promise((resolve) => {
+              db.query(
+                "SELECT correctAnswer FROM QuizQuestions WHERE id = ?",
+                [answer.questionId],
+                (err, results) => {
+                  if (results && results.length > 0 && answer.answer === results[0].correctAnswer) {
+                    correctCount++;
+                  }
+                  resolve();
+                }
+              );
+            });
+          });
+
+          Promise.all(answerPromises).then(() => {
+            const score = Math.round((correctCount / answers.length) * 100);
+
+            if (isResubmission) {
+              // Update existing submission
+              db.query(
+                "UPDATE QuizSubmissions SET score = ?, submittedAt = NOW() WHERE id = ?",
+                [score, submissionId],
+                (err) => {
+                  if (err) {
+                    console.error(err);
+                    return res.status(500).json({ message: "Failed to update submission" });
+                  }
+
+                  // Delete old answers
+                  db.query(
+                    "DELETE FROM QuizAnswers WHERE quizId = ? AND studentId = ?",
+                    [id, studentId],
+                    (deleteErr) => {
+                      if (deleteErr) console.error(deleteErr);
+
+                      // Insert new answers
+                      const insertPromises = answers.map(answer => {
+                        return new Promise((resolve) => {
+                          db.query(
+                            "INSERT INTO QuizAnswers (quizId, studentId, questionId, answer) VALUES (?, ?, ?, ?)",
+                            [id, studentId, answer.questionId, answer.answer],
+                            (insertErr) => {
+                              if (insertErr) console.error(insertErr);
+                              resolve();
+                            }
+                          );
+                        });
+                      });
+
+                      Promise.all(insertPromises).then(() => {
+                        res.json({
+                          message: "Quiz submitted successfully",
+                          score,
+                          correctAnswers: correctCount,
+                          totalQuestions: answers.length
+                        });
+                      });
+                    }
+                  );
+                }
+              );
+            } else {
+              // Create new submission
+              db.query(
+                "INSERT INTO QuizSubmissions (quizId, studentId, score, submittedAt) VALUES (?, ?, ?, NOW())",
+                [id, studentId, score],
+                (err, result) => {
+                  if (err) {
+                    console.error(err);
+                    return res.status(500).json({ message: "Failed to submit quiz" });
+                  }
+
+                  // Insert answers
+                  const insertPromises = answers.map(answer => {
+                    return new Promise((resolve) => {
+                      db.query(
+                        "INSERT INTO QuizAnswers (quizId, studentId, questionId, answer) VALUES (?, ?, ?, ?)",
+                        [id, studentId, answer.questionId, answer.answer],
+                        (insertErr) => {
+                          if (insertErr) console.error(insertErr);
+                          resolve();
+                        }
+                      );
+                    });
+                  });
+
+                  Promise.all(insertPromises).then(() => {
+                    res.status(201).json({
+                      message: "Quiz submitted successfully",
+                      submissionId: result.insertId,
+                      score,
+                      correctAnswers: correctCount,
+                      totalQuestions: answers.length
+                    });
+                  });
+                }
+              );
+            }
+          });
+        }
+      );
+    }
+  );
+});
+
+app.get("/api/quizzes/:id/my-answers", requireAuth, (req, res) => {
+  const { id } = req.params;
+
+  db.query(
+    "SELECT id FROM Students WHERE userId = ?",
+    [req.user.id],
+    (err, studentResults) => {
+      if (err || studentResults.length === 0) {
+        return res.status(404).json({ message: "Student not found" });
+      }
+
+      const studentId = studentResults[0].id;
+
+      db.query(
+        `SELECT qa.* FROM QuizAnswers qa
+         WHERE qa.quizId = ? AND qa.studentId = ?
+         ORDER BY qa.questionId`,
+        [id, studentId],
+        (err, results) => {
+          if (err) {
+            console.error(err);
+            return res.status(500).json({ message: "Database error" });
+          }
+
+          res.json({ answers: results || [] });
+        }
+      );
+    }
+  );
+});
+
+app.post("/api/quizzes/:id/grade/:studentId", requireAuth, (req, res) => {
+  const { id, studentId } = req.params;
+
+  db.query(
+    `SELECT qa.*, qq.correctAnswer FROM QuizAnswers qa
+     JOIN QuizQuestions qq ON qa.questionId = qq.id
+     WHERE qa.quizId = ? AND qa.studentId = ?`,
+    [id, studentId],
+    (err, answers) => {
+      if (err) {
+        console.error(err);
+        return res.status(500).json({ message: "Database error" });
+      }
+
+      const totalQuestions = answers.length;
+      let correctAnswers = 0;
+
+      answers.forEach(answer => {
+        if (answer.answer === answer.correctAnswer) {
+          correctAnswers++;
+        }
+      });
+
+      const score = totalQuestions > 0 ? Math.round((correctAnswers / totalQuestions) * 100) : 0;
+
+      db.query(
+        "UPDATE QuizSubmissions SET score = ? WHERE quizId = ? AND studentId = ?",
+        [score, id, studentId],
+        (updateErr) => {
+          if (updateErr) {
+            console.error(updateErr);
+            return res.status(500).json({ message: "Failed to save grade" });
+          }
+
+          res.json({
+            message: "Quiz graded successfully",
+            score,
+            correctAnswers,
+            totalQuestions
+          });
+        }
+      );
+    }
+  );
+});
+
+app.put("/api/quiz-submissions/:id/score", requireAuth, (req, res) => {
+  const { id } = req.params;
+  const { score } = req.body;
+
+  db.query(
+    "UPDATE QuizSubmissions SET score = ? WHERE id = ?",
+    [score, id],
+    (err) => {
+      if (err) {
+        console.error(err);
+        return res.status(500).json({ message: "Failed to update score" });
+      }
+
+      res.json({ message: "Score updated successfully" });
+    }
+  );
+});
+
+app.get("/api/student/quiz-submissions", requireAuth, (req, res) => {
+  db.query(
+    "SELECT id FROM Students WHERE userId = ?",
+    [req.user.id],
+    (err, studentResults) => {
+      if (err || studentResults.length === 0) {
+        return res.status(404).json({ message: "Student not found" });
+      }
+
+      const studentId = studentResults[0].id;
+
+      db.query(
+        `SELECT qs.*, q.title, q.courseId, c.name as courseName
+         FROM QuizSubmissions qs
+         JOIN Quizzes q ON qs.quizId = q.id
+         JOIN Courses c ON q.courseId = c.id
+         WHERE qs.studentId = ?
+         ORDER BY qs.submittedAt DESC`,
+        [studentId],
+        (err, results) => {
+          if (err) {
+            console.error(err);
+            return res.status(500).json({ message: "Database error" });
+          }
+
+          const submissions = results.map(sub => ({
+            quizId: sub.quizId,
+            studentId: sub.studentId,
+            score: sub.score,
+            status: sub.score !== null ? (sub.score >= 60 ? 'Pass' : 'Fail') : 'Pending',
+            submittedAt: sub.submittedAt,
+            title: sub.title,
+            courseName: sub.courseName
+          }));
+
+          res.json({ submissions });
+        }
+      );
+    }
+  );
+});
+
+app.get("/api/instructor/quiz-results", requireAuth, (req, res) => {
+  const userId = req.user.id;
+  const { quizId, courseId } = req.query;
+
+  db.query(
+    "SELECT id FROM Instructors WHERE userId = ?",
+    [userId],
+    (err, instructorResults) => {
+      if (err || instructorResults.length === 0) {
+        return res.status(400).json({ message: "Instructor record not found" });
+      }
+
+      const instructorId = instructorResults[0].id;
+
+      let query = `
+        SELECT qs.*, q.title, q.courseId, c.name as courseName, s.id as studentId, u.firstName, u.lastName
+        FROM QuizSubmissions qs
+        JOIN Quizzes q ON qs.quizId = q.id
+        JOIN Courses c ON q.courseId = c.id
+        JOIN Students s ON qs.studentId = s.id
+        JOIN Users u ON s.userId = u.id
+        JOIN CourseInstructors ci ON c.id = ci.courseId
+        WHERE ci.instructorId = ?
+      `;
+      const params = [instructorId];
+
+      if (quizId) {
+        query += ` AND q.id = ?`;
+        params.push(quizId);
+      }
+
+      if (courseId) {
+        query += ` AND c.id = ?`;
+        params.push(courseId);
+      }
+
+      query += ` ORDER BY qs.submittedAt DESC`;
+
+      db.query(query, params, (err, results) => {
+        if (err) {
+          console.error(err);
+          return res.status(500).json({ message: "Database error" });
+        }
+
+        res.json({ results: results || [] });
+      });
+    }
+  );
+});
+
 app.get("/api/instructor/stats", requireAuth, (req, res) => {
   const userId = req.user.id;
 

@@ -16,20 +16,30 @@ const apiFetch = (url, options = {}) => {
 };
 
 const handleResponse = async (response) => {
-  let data;
-  try {
-    data = await response.json();
-  } catch (e) {
-    const text = await response.text();
-    if (!response.ok) throw new Error(text || 'An error occurred');
-    return text;
-  }
-  
   if (!response.ok) {
-    throw new Error(data.message || 'An error occurred');
+    let errorMessage = 'An error occurred';
+    try {
+      const data = await response.json();
+      errorMessage = data.message || errorMessage;
+    } catch (e) {
+      try {
+        errorMessage = await response.text();
+      } catch (textError) {
+        errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+      }
+    }
+    throw new Error(errorMessage);
   }
-  
-  return data;
+
+  try {
+    return await response.json();
+  } catch (e) {
+    try {
+      return await response.text();
+    } catch (textError) {
+      return null;
+    }
+  }
 };
 
 const handleError = (error) => {

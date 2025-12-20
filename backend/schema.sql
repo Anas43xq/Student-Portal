@@ -167,6 +167,34 @@ CREATE TABLE Quizzes (
   CONSTRAINT chk_passing_score CHECK (passingScore >= 0 AND passingScore <= totalPoints)
 );
 
+CREATE TABLE QuizQuestions (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  quizId INT NOT NULL,
+  questionText TEXT NOT NULL,
+  correctAnswer VARCHAR(500) DEFAULT NULL,
+  points INT NOT NULL DEFAULT 1,
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (quizId) REFERENCES Quizzes(id) ON DELETE CASCADE,
+  INDEX idx_quizId (quizId)
+);
+
+CREATE TABLE QuizAnswers (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  quizId INT NOT NULL,
+  studentId INT NOT NULL,
+  questionId INT NOT NULL,
+  answer VARCHAR(500) DEFAULT NULL,
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (quizId) REFERENCES Quizzes(id) ON DELETE CASCADE,
+  FOREIGN KEY (studentId) REFERENCES Students(id) ON DELETE CASCADE,
+  FOREIGN KEY (questionId) REFERENCES QuizQuestions(id) ON DELETE CASCADE,
+  INDEX idx_quizId (quizId),
+  INDEX idx_studentId (studentId),
+  INDEX idx_questionId (questionId)
+);
+
 CREATE TABLE QuizSubmissions (
   id INT PRIMARY KEY AUTO_INCREMENT,
   quizId INT NOT NULL,
@@ -441,39 +469,75 @@ INSERT INTO Enrollments (studentId, courseId, semester, year, grade, status) VAL
 (15, 10, 'Fall', 2025, 'B', 'Active'),
 (15, 12, 'Fall', 2025, 'A-', 'Active');
 
-DELIMITER $$
+-- Insert Sample Quiz Questions
+INSERT INTO QuizQuestions (quizId, questionText, correctAnswer, points) VALUES
+-- Quiz 1 (Python Basics)
+(1, 'What is the output of print(2 + 2 * 2)?', '6', 1),
+(1, 'Which of the following is a valid variable name?', 'my_var', 1),
+(1, 'What does the input() function do?', 'Reads user input', 1),
+-- Quiz 2 (Functions and Loops)
+(2, 'How do you define a function in Python?', 'def function_name():', 1),
+(2, 'What keyword is used to repeat a block of code?', 'while or for', 1),
+(2, 'What is the output of range(5)?', '0, 1, 2, 3, 4', 1),
+-- Quiz 4 (Data Structures Midterm)
+(4, 'What is the time complexity of binary search?', 'O(log n)', 1),
+(4, 'Which data structure uses LIFO?', 'Stack', 1),
+(4, 'What is a linked list node?', 'Object containing data and pointer', 1),
+-- Quiz 5 (Algorithms)
+(5, 'What is the worst-case time complexity of quicksort?', 'O(n^2)', 1),
+(5, 'Which sorting algorithm is stable?', 'Merge Sort', 1),
+-- Quiz 6 (HTML & CSS)
+(6, 'What does HTML stand for?', 'HyperText Markup Language', 1),
+(6, 'How do you select an element by class in CSS?', '.classname', 1),
+-- Quiz 7 (JavaScript)
+(7, 'What is the difference between let and var?', 'Scope and hoisting', 1),
+(7, 'How do you create a function in JavaScript?', 'function name() {}', 1),
+-- Quiz 8 (Business Principles)
+(8, 'What are the four Ps of marketing?', 'Product, Price, Place, Promotion', 1),
+(8, 'What does SWOT stand for?', 'Strengths, Weaknesses, Opportunities, Threats', 1),
+-- Quiz 9 (Leadership)
+(9, 'What is transformational leadership?', 'Leadership that inspires change', 1),
+(9, 'What is emotional intelligence?', 'Ability to recognize and manage emotions', 1),
+-- Quiz 10 (Psychology Basics)
+(10, 'Who developed the theory of classical conditioning?', 'Ivan Pavlov', 1),
+(10, 'What is the psychological disorder characterized by excessive fear?', 'Anxiety Disorder', 1),
+-- Quiz 11 (Behavioral Psychology)
+(11, 'What is positive reinforcement?', 'Adding a desirable consequence after behavior', 1),
+(11, 'Who is known for behaviorism?', 'B.F. Skinner', 1),
+-- Quiz 12 (Statics)
+(12, 'In statics, what does equilibrium mean?', 'Net force is zero', 1),
+(12, 'What is the SI unit of force?', 'Newton', 1),
+-- Quiz 13 (Dynamics)
+(13, 'What is Newtons second law?', 'F = ma', 1),
+(13, 'What is acceleration?', 'Change in velocity over time', 1),
+-- Quiz 14 (Calculus)
+(14, 'What is the derivative of x^2?', '2x', 1),
+(14, 'What is the limit as x approaches 2 of (x^2 + 2)?', '6', 1),
+-- Quiz 15 (Integration)
+(15, 'What is the integral of 2x?', 'x^2 + C', 1),
+(15, 'What does the constant C represent in integration?', 'Constant of integration', 1),
+-- Quiz 16 (Statistics)
+(16, 'What is standard deviation?', 'Measure of spread from mean', 1),
+(16, 'In a normal distribution, what percentage falls within 1 standard deviation?', '68%', 1),
+-- Quiz 17 (Probability)
+(17, 'What is the probability of rolling a 6 on a fair die?', '1/6', 1),
+(17, 'What is the sum of all probabilities in a probability distribution?', '1', 1);
 
-CREATE TRIGGER after_enrollment_insert
-AFTER INSERT ON Enrollments
-FOR EACH ROW
-BEGIN
-  UPDATE Courses 
-  SET currentEnrollment = currentEnrollment + 1 
-  WHERE id = NEW.courseId;
-END$$
+-- Insert Sample Quiz Answers (student submissions)
+INSERT INTO QuizAnswers (quizId, studentId, questionId, answer) VALUES
+-- Student 1 answers to Quiz 1 (Python Basics)
+(1, 1, 1, '6'),
+(1, 1, 2, 'my_var'),
+(1, 1, 3, 'Reads user input'),
+-- Student 1 answers to Quiz 2 (Functions and Loops)
+(2, 1, 4, 'def function_name():'),
+(2, 1, 5, 'while or for'),
+(2, 1, 6, '0, 1, 2, 3, 4'),
+-- Student 2 answers to Quiz 1
+(1, 2, 1, '8'),
+(1, 2, 2, 'my-var'),
+(1, 2, 3, 'Reads user input');
 
-CREATE TRIGGER after_enrollment_delete
-AFTER DELETE ON Enrollments
-FOR EACH ROW
-BEGIN
-  UPDATE Courses 
-  SET currentEnrollment = currentEnrollment - 1 
-  WHERE id = OLD.courseId AND currentEnrollment > 0;
-END$$
-
-CREATE TRIGGER after_enrollment_update
-AFTER UPDATE ON Enrollments
-FOR EACH ROW
-BEGIN
-  IF NEW.status = 'Completed' AND OLD.status != 'Completed' THEN
-    UPDATE Students s
-    JOIN Courses c ON c.id = NEW.courseId
-    SET s.totalCredits = s.totalCredits + c.credits
-    WHERE s.id = NEW.studentId;
-  END IF;
-END$$
-
-DELIMITER ;
 
 
 CREATE VIEW StudentDetails AS

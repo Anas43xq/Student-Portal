@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Search, BookOpen, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { coursesAPI, enrollmentsAPI } from '../../services/api';
+import { coursesAPI, enrollmentsAPI, instructorsAPI } from '../../services/api';
 
 const CREDIT_LIMITS = { Fall: 18, Spring: 18, Summer: 10 };
 
@@ -19,6 +19,7 @@ const CoursesPage = () => {
   const [enrolling, setEnrolling] = useState(false);
 
   const [departments, setDepartments] = useState(['All']);
+  const [instructors, setInstructors] = useState([]);
   const semesters = ['All', 'Fall', 'Spring', 'Summer'];
 
   const [showModal, setShowModal] = useState(false);
@@ -60,6 +61,15 @@ const CoursesPage = () => {
     }
   }, [searchTerm, filterDept, filterSemester]);
 
+  const fetchInstructors = useCallback(async () => {
+    try {
+      const data = await instructorsAPI.getAll();
+      setInstructors(data.instructors || []);
+    } catch (err) {
+      console.error('Failed to fetch instructors:', err);
+    }
+  }, []);
+
   const fetchStudentEnrollments = useCallback(async () => {
     if (!user.studentId) {
       console.error('No student ID found');
@@ -85,10 +95,11 @@ const CoursesPage = () => {
 
   useEffect(() => {
     fetchCourses();
+    fetchInstructors();
     if (user.role === 'Student') {
       fetchStudentEnrollments();
     }
-  }, [fetchCourses, fetchStudentEnrollments, user]);
+  }, [fetchCourses, fetchInstructors, fetchStudentEnrollments, user]);
 
   useEffect(() => {
     fetchCourses();
@@ -499,15 +510,20 @@ const CoursesPage = () => {
                       />
                     </div>
                     <div className="col-md-6">
-                      <label className="form-label">Instructor ID</label>
-                      <input
-                        type="number"
-                        className="form-control"
+                      <label className="form-label">Instructor</label>
+                      <select
+                        className="form-select"
                         name="instructorId"
                         value={formData.instructorId}
                         onChange={handleInputChange}
-                        placeholder="Instructor ID"
-                      />
+                      >
+                        <option value="">Select Instructor</option>
+                        {instructors.map(instructor => (
+                          <option key={instructor.id} value={instructor.id}>
+                            {instructor.firstName} {instructor.lastName}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                   </div>
                   <div className="modal-footer mt-4">

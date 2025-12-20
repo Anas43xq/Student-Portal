@@ -2,6 +2,24 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Search, Users } from 'lucide-react';
 import { studentsAPI } from '../../services/api';
 
+const MAJORS = [
+  'Computer Science',
+  'Engineering',
+  'Business',
+  'Mathematics',
+  'Physics',
+  'Chemistry',
+  'Biology',
+  'Psychology',
+  'Economics',
+  'Literature',
+  'History',
+  'Political Science',
+  'Art',
+  'Music',
+  'Law'
+];
+
 const StudentsPage = ({ onViewDetails }) => {
   const [students, setStudents] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -406,13 +424,17 @@ const StudentsPage = ({ onViewDetails }) => {
                     </div>
                     <div className="col-md-6">
                       <label className="form-label">Major</label>
-                      <input
-                        type="text"
-                        className="form-control"
+                      <select
+                        className="form-select"
                         name="major"
                         value={formData.major}
                         onChange={handleInputChange}
-                      />
+                      >
+                        <option value="">Select Major</option>
+                        {MAJORS.map(major => (
+                          <option key={major} value={major}>{major}</option>
+                        ))}
+                      </select>
                     </div>
                     <div className="col-md-4">
                       <label className="form-label">GPA</label>
@@ -428,14 +450,17 @@ const StudentsPage = ({ onViewDetails }) => {
                       />
                     </div>
                     <div className="col-md-4">
-                      <label className="form-label">Total Credits</label>
+                      <label className="form-label">Total Credits (Earned)</label>
                       <input
                         type="number"
                         className="form-control"
                         name="totalCredits"
                         value={formData.totalCredits}
-                        onChange={handleInputChange}
+                        readOnly
+                        disabled
+                        title="Total credits are automatically calculated based on completed courses"
                       />
+                      <small className="form-text text-muted mt-1">Auto-calculated. Max enrollable: 18 credits/semester</small>
                     </div>
                     <div className="col-md-4">
                       <label className="form-label">Status</label>
