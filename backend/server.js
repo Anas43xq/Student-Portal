@@ -23,14 +23,17 @@ if (process.env.TRUST_PROXY === '1') {
 }
 
 // Session configuration
+const isProd = process.env.NODE_ENV === 'production';
 app.use(session({
   secret: process.env.SESSION_SECRET || 'your-session-secret-key',
   resave: false,
   saveUninitialized: false,
   cookie: {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax'
+    // Use secure cookies in production (requires HTTPS)
+    secure: isProd,
+    // For cross-site requests (deployed frontend on different origin), set SameSite=None in production
+    sameSite: isProd ? 'none' : 'lax'
   }
 }));
 
@@ -1041,6 +1044,7 @@ app.delete("/api/enrollments/:id", requireAuth, (req, res) => {
 // ============================================
 
 app.get("/api/admin/stats", requireAdmin, (req, res) => {
+  console.log('GET /api/admin/stats - origin:', req.headers.origin, 'user:', req.user && req.user.id);
   const stats = {};
 
   db.query("SELECT COUNT(*) as total FROM Students WHERE status = 'Active'", (err, results) => {

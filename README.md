@@ -183,8 +183,6 @@ Create `backend/Configurations.env`:
 NODE_ENV=production
 CORS_ORIGIN=https://anas43xq.github.io
 SESSION_SECRET=your-secret-key
-JWT_SECRET=your-jwt-secret
-
 # Database
 DB_HOST=sql5.freesqldatabase.com
 DB_USER=sql5812469
@@ -197,6 +195,16 @@ MAX_CREDITS_PER_SEMESTER=18
 BCRYPT_SALT_ROUNDS=10
 ```
 
+### Running with the hosted (online) frontend
+If your frontend is hosted on a different origin (e.g., GitHub Pages), ensure cross-origin session cookies work by following these steps:
+
+1. **Set `CORS_ORIGIN`** to the exact origin of your hosted frontend (e.g., `https://anas43xq.github.io`).
+2. **Use HTTPS for both frontend and backend** — secure cookies are required when using `SameSite=None`.
+3. **Set `NODE_ENV=production`** in `Configurations.env` so the server will use secure cookies and `SameSite=None` for cross-site sessions.
+4. **If behind a proxy (Render)**, set `TRUST_PROXY=1` so secure cookies are handled correctly.
+5. **Verify cookies are sent**: open DevTools → Network, select an API request, and confirm the `Cookie` header is present and the response includes `Access-Control-Allow-Credentials: true` and `Access-Control-Allow-Origin` matches your frontend origin.
+
+If you still see "Failed to load dashboard data", check the backend logs for messages like `GET /api/admin/stats - origin: ...` (added to help debug cross-origin requests).
 ## 📊 Database Schema
 
 The application uses MySQL with the following main tables:

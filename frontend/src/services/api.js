@@ -2,7 +2,9 @@ const API_BASE_URL = 'https://student-portal-owa4.onrender.com';
 
 // Simple fetch wrapper without complex authentication
 const apiFetch = (url, options = {}) => {
-  return fetch(url, options);
+  // Include cookies/session credentials by default for same-origin or cross-origin (if server allows it)
+  const opts = { credentials: 'include', ...options };
+  return fetch(url, opts);
 };
 
 // ============================================
@@ -10,7 +12,15 @@ const apiFetch = (url, options = {}) => {
 // ============================================
 
 const handleResponse = async (response) => {
-  const data = await response.json();
+  let data;
+  try {
+    data = await response.json();
+  } catch (e) {
+    // If response is not JSON, fall back to text
+    const text = await response.text();
+    if (!response.ok) throw new Error(text || 'An error occurred');
+    return text;
+  }
   
   if (!response.ok) {
     throw new Error(data.message || 'An error occurred');
