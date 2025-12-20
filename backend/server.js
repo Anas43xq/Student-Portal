@@ -1,7 +1,7 @@
 const express = require("express");
 const mysql = require("mysql2");
 const bcrypt = require("bcryptjs");
-const session = require('express-session');
+const jwt = require("jsonwebtoken");
 const bodyParser = require("body-parser");
 const cors = require("cors");
 const path = require('path');
@@ -11,31 +11,16 @@ require('dotenv').config({ path: envPath });
 const app = express();
 
 app.use(cors({
-  origin: process.env.CORS_ORIGIN,
-  credentials: true
+  origin: process.env.CORS_ORIGIN || 'https://anas43xq.github.io',
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
+
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-if (process.env.TRUST_PROXY === '1') {
-  // When running behind a proxy (e.g., Render), trust the first proxy so secure cookies work
-  app.set('trust proxy', 1);
-}
-
-// Session configuration
-const isProd = process.env.NODE_ENV === 'production';
-app.use(session({
-  secret: process.env.SESSION_SECRET || 'your-session-secret-key',
-  resave: false,
-  saveUninitialized: false,
-  cookie: {
-    httpOnly: true,
-    // Use secure cookies in production (requires HTTPS)
-    secure: isProd,
-    // For cross-site requests (deployed frontend on different origin), set SameSite=None in production
-    sameSite: isProd ? 'none' : 'lax'
-  }
-}));
+const JWT_SECRET = process.env.JWT_SECRET || 'your-jwt-secret-key-change-in-production';
 
 const db = mysql.createPool({
   host: process.env.DB_HOST || 'localhost',
@@ -57,21 +42,67 @@ db.getConnection((err, connection) => {
   connection.release();
 });
 
-// Session-based auth middleware
+// JWT-based auth middleware
 const requireAuth = (req, res, next) => {
-  if (!req.session || !req.session.user) {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({ message: "Authentication required" });
   }
-  req.user = req.session.user;
-  next();
+
+  const token = authHeader.substring(7);
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    req.user = decoded;
+    next();
+  } catch (error) {
+    console.error('JWT verification failed:', error.message);
+    return res.status(401).json({ message: "Invalid or expired token" });
+  }
 };
 
 const requireAdmin = (req, res, next) => {
-  if (!req.session || !req.session.user || req.session.user.role !== 'Admin') {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    console.log('requireAdmin - no auth header or not Bearer');
     return res.status(403).json({ message: "Admin access required" });
   }
-  req.user = req.session.user;
-  next();
+
+  const token = authHeader.substring(7);
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    console.log('requireAdmin - decoded role:', decoded.role);
+
+    if (decoded.role !== 'Admin') {
+      console.log('requireAdmin - user is not admin');
+      return res.status(403).json({ message: "Admin access required" });
+    }
+
+    req.user = decoded;
+    next();
+  } catch (error) {
+    console.error('JWT verification failed:', error.message);
+    return res.status(403).json({ message: "Invalid or expired token" });
+  }
+};
+
+const generateToken = (user) => {
+  return jwt.sign(
+    {
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      role: user.role,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      studentId: user.studentId
+    },
+    JWT_SECRET,
+    { expiresIn: '24h' }
+  );
 };
 
 app.post("/register", async (req, res) => {
@@ -97,7 +128,6 @@ app.post("/register", async (req, res) => {
 
         const hashedPassword = await bcrypt.hash(password, 10);
 
-     
         db.query(
           "INSERT INTO Users (username, password, email, role, firstName, lastName) VALUES (?, ?, ?, ?, ?, ?)",
           [username, hashedPassword, email, role || 'Student', firstName, lastName],
@@ -130,10 +160,6 @@ app.post("/register", async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
-
-// ============================================
-// AUTHENTICATION ROUTES (All Roles)
-// ============================================
 
 app.post("/login", async (req, res) => {
   try {
@@ -172,7 +198,6 @@ app.post("/login", async (req, res) => {
           return res.status(401).json({ message: "Invalid credentials" });
         }
 
-        // Create session-based authentication
         if (user.role === 'Student') {
           db.query(
             "SELECT * FROM Students WHERE userId = ?",
@@ -188,10 +213,7 @@ app.post("/login", async (req, res) => {
                 return res.status(500).json({ message: "Student record not found. Please contact administrator." });
               }
 
-              console.log('Login successful for student. UserId:', user.id, 'StudentId:', studentResults[0].id);
-
-              // Save user info in session
-              req.session.user = {
+              const userData = {
                 id: user.id,
                 username: user.username,
                 email: user.email,
@@ -201,14 +223,17 @@ app.post("/login", async (req, res) => {
                 studentId: studentResults[0].id
               };
 
+              const token = generateToken(userData);
+
               res.json({
                 message: "Login successful",
-                user: req.session.user
+                token: token,
+                user: userData
               });
             }
           );
         } else {
-          req.session.user = {
+          const userData = {
             id: user.id,
             username: user.username,
             email: user.email,
@@ -217,9 +242,12 @@ app.post("/login", async (req, res) => {
             lastName: user.lastName
           };
 
+          const token = generateToken(userData);
+
           res.json({
             message: "Login successful",
-            user: req.session.user
+            token: token,
+            user: userData
           });
         }
       }
@@ -231,17 +259,7 @@ app.post("/login", async (req, res) => {
 });
 
 app.post("/logout", (req, res) => {
-  // Destroy session and clear cookie
-  req.session.destroy((err) => {
-    if (err) {
-      console.error('Error destroying session during logout:', err);
-      return res.status(500).json({ message: 'Logout failed' });
-    }
-
-    // Clear session cookie (default name is connect.sid)
-    res.clearCookie('connect.sid');
-    res.json({ message: "Logout successful" });
-  });
+  res.json({ message: "Logout successful" });
 });
 
 app.get("/api/auth/validate", requireAuth, (req, res) => {
@@ -255,15 +273,12 @@ app.get("/api/auth/session", requireAuth, (req, res) => {
   });
 });
 
-// ============================================
-// ADMIN ROUTES - Student Management
-// ============================================
-
+// Admin Routes
 app.get("/api/students", requireAdmin, (req, res) => {
   const { search, status, page = 1, limit = 10 } = req.query;
-  
+
   let query = `
-    SELECT s.*, u.firstName, u.lastName, u.email 
+    SELECT s.*, u.firstName, u.lastName, u.email
     FROM Students s
     JOIN Users u ON s.userId = u.id
     WHERE 1=1
@@ -311,8 +326,6 @@ app.get("/api/students", requireAdmin, (req, res) => {
 app.get("/api/students/:id", requireAuth, (req, res) => {
   const { id } = req.params;
 
-  console.log('GET /api/students/:id - User:', { userId: req.user.id, role: req.user.role }, 'Requested ID:', id);
-
   if (req.user.role === 'Student') {
     db.query(
       "SELECT id FROM Students WHERE userId = ?",
@@ -324,17 +337,13 @@ app.get("/api/students/:id", requireAuth, (req, res) => {
         }
 
         if (results.length === 0) {
-          console.error('No student record found for userId:', req.user.id);
           return res.status(403).json({ message: "Access denied - No student record found" });
         }
-        
-        console.log('Student record found. StudentId:', results[0].id, 'Requested ID:', id);
-        
+
         if (results[0].id != id) {
-          console.error('Student ID mismatch. Student has ID:', results[0].id, 'but requested:', id);
           return res.status(403).json({ message: "Access denied - Cannot view other students" });
         }
-        
+
         getStudentById(id, res);
       }
     );
@@ -369,7 +378,6 @@ function getStudentById(id, res) {
         (err, enrollments) => {
           if (err) console.error(err);
 
-          // Calculate GPA from grades
           const gradePoints = {
             'A': 4.0, 'A-': 3.7,
             'B+': 3.3, 'B': 3.0, 'B-': 2.7,
@@ -395,7 +403,6 @@ function getStudentById(id, res) {
 
           const calculatedGPA = totalCredits > 0 ? (totalPoints / totalCredits).toFixed(2) : null;
 
-          // Update student record with calculated values
           db.query(
             'UPDATE Students SET gpa = ?, totalCredits = ? WHERE id = ?',
             [calculatedGPA, earnedCredits, id],
@@ -418,10 +425,10 @@ function getStudentById(id, res) {
 
 app.post("/api/students", requireAdmin, async (req, res) => {
   try {
-    const { 
-      firstName, lastName, email, dateOfBirth, gender, phone, 
-      address, city, state, zipCode, enrollmentDate, major, 
-      gpa, totalCredits, status 
+    const {
+      firstName, lastName, email, dateOfBirth, gender, phone,
+      address, city, state, zipCode, enrollmentDate, major,
+      gpa, totalCredits, status
     } = req.body;
 
     if (!firstName || !lastName || !email) {
@@ -430,7 +437,7 @@ app.post("/api/students", requireAdmin, async (req, res) => {
 
     const username = email.split('@')[0] + Math.floor(Math.random() * 1000);
     const defaultPassword = 'student123';
-    
+
     const hashedPassword = await bcrypt.hash(defaultPassword, 10);
 
     db.query(
@@ -443,22 +450,22 @@ app.post("/api/students", requireAdmin, async (req, res) => {
         }
 
         db.query(
-          `INSERT INTO Students 
-            (userId, dateOfBirth, gender, phone, address, city, state, zipCode, enrollmentDate, major, gpa, totalCredits, status) 
+          `INSERT INTO Students
+            (userId, dateOfBirth, gender, phone, address, city, state, zipCode, enrollmentDate, major, gpa, totalCredits, status)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
-            userResult.insertId, 
-            dateOfBirth || null, 
-            gender || null, 
-            phone || null, 
+            userResult.insertId,
+            dateOfBirth || null,
+            gender || null,
+            phone || null,
             address || null,
-            city || null, 
-            state || null, 
-            zipCode || null, 
-            enrollmentDate || new Date(), 
-            major || null, 
-            gpa || null, 
-            totalCredits || 0, 
+            city || null,
+            state || null,
+            zipCode || null,
+            enrollmentDate || new Date(),
+            major || null,
+            gpa || null,
+            totalCredits || 0,
             status || 'Active'
           ],
           (err, studentResult) => {
@@ -495,10 +502,10 @@ app.post("/api/students", requireAdmin, async (req, res) => {
 
 app.put("/api/students/:id", requireAdmin, (req, res) => {
   const { id } = req.params;
-  const { 
-    firstName, lastName, email, dateOfBirth, gender, phone, 
-    address, city, state, zipCode, enrollmentDate, major, 
-    gpa, totalCredits, status 
+  const {
+    firstName, lastName, email, dateOfBirth, gender, phone,
+    address, city, state, zipCode, enrollmentDate, major,
+    gpa, totalCredits, status
   } = req.body;
 
   db.query(
@@ -521,10 +528,10 @@ app.put("/api/students/:id", requireAdmin, (req, res) => {
           }
 
           db.query(
-            `UPDATE Students SET 
-              dateOfBirth = ?, gender = ?, phone = ?, address = ?, 
-              city = ?, state = ?, zipCode = ?, enrollmentDate = ?, 
-              major = ?, gpa = ?, totalCredits = ?, status = ? 
+            `UPDATE Students SET
+              dateOfBirth = ?, gender = ?, phone = ?, address = ?,
+              city = ?, state = ?, zipCode = ?, enrollmentDate = ?,
+              major = ?, gpa = ?, totalCredits = ?, status = ?
             WHERE id = ?`,
             [
               dateOfBirth || null, gender || null, phone || null, address || null,
@@ -571,8 +578,8 @@ app.delete("/api/students/:id", requireAdmin, (req, res) => {
           }
 
           logActivity(
-            req.user && req.user.id,
-            req.user && req.user.username,
+            req.user.id,
+            req.user.username,
             'DELETE',
             'Student',
             id,
@@ -586,10 +593,6 @@ app.delete("/api/students/:id", requireAdmin, (req, res) => {
     }
   );
 });
-
-// ============================================
-// STUDENT ROUTES - Course & Enrollment Management
-// ============================================
 
 app.get("/api/courses", requireAuth, (req, res) => {
   const { search, department, semester } = req.query;
@@ -619,13 +622,13 @@ app.get("/api/courses", requireAuth, (req, res) => {
     }
 
     const courseIds = results.map(c => c.id);
-    
+
     if (courseIds.length === 0) {
       return res.json({ courses: [] });
     }
 
     db.query(
-      `SELECT ci.courseId, i.* 
+      `SELECT ci.courseId, i.*
        FROM CourseInstructors ci
        JOIN Instructors i ON ci.instructorId = i.id
        WHERE ci.courseId IN (?)`,
@@ -682,8 +685,8 @@ app.post("/api/courses", requireAdmin, (req, res) => {
       }
 
       logActivity(
-        req.user && req.user.id,
-        req.user && req.user.username,
+        req.user.id,
+        req.user.username,
         'CREATE',
         'Course',
         result.insertId,
@@ -713,8 +716,8 @@ app.put("/api/courses/:id", requireAdmin, (req, res) => {
       }
 
       logActivity(
-        req.user && req.user.id,
-        req.user && req.user.username,
+        req.user.id,
+        req.user.username,
         'UPDATE',
         'Course',
         id,
@@ -748,8 +751,8 @@ app.delete("/api/courses/:id", requireAdmin, (req, res) => {
         }
 
         logActivity(
-          req.user && req.user.id,
-          req.user && req.user.username,
+          req.user.id,
+          req.user.username,
           'DELETE',
           'Course',
           id,
@@ -767,7 +770,7 @@ app.get("/api/enrollments", requireAuth, (req, res) => {
   const { studentId, courseId, status } = req.query;
 
   let query = `
-    SELECT e.*, 
+    SELECT e.*,
            s.id as studentId, u.firstName, u.lastName,
            c.name as courseName, c.code as courseCode, c.credits as courseCredits
     FROM Enrollments e
@@ -827,8 +830,6 @@ function executeEnrollmentQuery(query, params, status, res) {
 app.post("/api/enrollments", requireAuth, (req, res) => {
   const { studentId, courseId, semester, year } = req.body;
 
-  console.log('POST /api/enrollments - Request:', { studentId, courseId, semester, year, userId: req.user && req.user.id });
-
   if (!studentId || !courseId || !semester || !year) {
     return res.status(400).json({ message: "Required fields missing" });
   }
@@ -871,14 +872,13 @@ app.post("/api/enrollments", requireAuth, (req, res) => {
               const courseCredits = courseResults[0].credits;
 
               if (currentCredits + courseCredits > 18) {
-                return res.status(400).json({ 
+                return res.status(400).json({
                   message: "Credit limit exceeded. Maximum 18 credits per semester.",
                   currentCredits,
                   maxCredits: 18
                 });
               }
 
- 
               db.query(
                 "INSERT INTO Enrollments (studentId, courseId, semester, year) VALUES (?, ?, ?, ?)",
                 [studentId, courseId, semester, year],
@@ -888,16 +888,12 @@ app.post("/api/enrollments", requireAuth, (req, res) => {
                     return res.status(500).json({ message: "Failed to create enrollment" });
                   }
 
-                  console.log('Enrollment created successfully. ID:', result.insertId);
-
-                  // Increment currentEnrollment in Courses table
                   db.query(
                     "UPDATE Courses SET currentEnrollment = currentEnrollment + 1 WHERE id = ?",
                     [courseId],
                     (updateErr) => {
                       if (updateErr) {
                         console.error('Failed to update course enrollment count:', updateErr);
-                        // Don't fail the enrollment creation, just log the error
                       }
 
                       res.status(201).json({
@@ -920,11 +916,10 @@ app.put("/api/enrollments/:id", requireAuth, (req, res) => {
   const { id } = req.params;
   const { grade, status } = req.body;
 
-  if (!req.user || req.user.role !== 'Admin') {
+  if (req.user.role !== 'Admin') {
     return res.status(403).json({ message: "Only admins can update enrollments" });
   }
 
-  // First, get the current enrollment status to check if it's changing to 'Completed'
   db.query(
     "SELECT status, studentId, courseId FROM Enrollments WHERE id = ?",
     [id],
@@ -951,7 +946,6 @@ app.put("/api/enrollments/:id", requireAuth, (req, res) => {
             return res.status(500).json({ message: "Failed to update enrollment" });
           }
 
-          // If status changed to 'Completed' and wasn't before, add credits to student
           if (status === 'Completed' && currentStatus !== 'Completed') {
             db.query(
               "SELECT credits FROM Courses WHERE id = ?",
@@ -991,11 +985,10 @@ app.put("/api/enrollments/:id", requireAuth, (req, res) => {
 app.delete("/api/enrollments/:id", requireAuth, (req, res) => {
   const { id } = req.params;
 
-  if (!req.user || req.user.role !== 'Admin') {
+  if (req.user.role !== 'Admin') {
     return res.status(403).json({ message: "Only admins can delete enrollments" });
   }
 
-  // First, get the courseId for the enrollment to decrement currentEnrollment
   db.query(
     "SELECT courseId FROM Enrollments WHERE id = ?",
     [id],
@@ -1020,14 +1013,12 @@ app.delete("/api/enrollments/:id", requireAuth, (req, res) => {
             return res.status(500).json({ message: "Failed to delete enrollment" });
           }
 
-          // Decrement currentEnrollment in Courses table if > 0
           db.query(
             "UPDATE Courses SET currentEnrollment = GREATEST(currentEnrollment - 1, 0) WHERE id = ?",
             [courseId],
             (updateErr) => {
               if (updateErr) {
                 console.error('Failed to update course enrollment count:', updateErr);
-                // Don't fail the enrollment deletion, just log the error
               }
 
               res.json({ message: "Enrollment deleted successfully" });
@@ -1039,13 +1030,7 @@ app.delete("/api/enrollments/:id", requireAuth, (req, res) => {
   );
 });
 
-// ============================================
-// ADMIN ROUTES - Dashboard & User Management
-// ============================================
-
 app.get("/api/admin/stats", requireAdmin, (req, res) => {
-  console.log('GET /api/admin/stats - origin:', req.headers.origin, 'user:', req.user && req.user.id);
-  console.log('SESSION USER at /api/admin/stats:', req.session && req.session.user);
   const stats = {};
 
   db.query("SELECT COUNT(*) as total FROM Students WHERE status = 'Active'", (err, results) => {
@@ -1073,8 +1058,8 @@ app.get("/api/admin/stats", requireAdmin, (req, res) => {
 
 app.get("/api/admin/users", requireAdmin, (req, res) => {
   db.query(
-    `SELECT u.id, u.username, u.email, u.role, u.firstName, u.lastName, u.createdAt, 
-     u.isBanned, u.bannedAt, u.banReason, 
+    `SELECT u.id, u.username, u.email, u.role, u.firstName, u.lastName, u.createdAt,
+     u.isBanned, u.bannedAt, u.banReason,
      CONCAT(b.firstName, ' ', b.lastName) as bannedByName
      FROM Users u
      LEFT JOIN Users b ON u.bannedBy = b.id`,
@@ -1122,15 +1107,15 @@ app.post("/api/admin/users", requireAdmin, async (req, res) => {
             }
 
             const fullName = `${firstName || ''} ${lastName || ''}`.trim() || username;
-                      logActivity(
-                        req.user && req.user.id,
-                        req.user && req.user.username,
-                        'CREATE',
-                        'User',
-                        result.insertId,
-                        fullName,
-                        `Created new ${role} user: ${username}`
-                      );
+            logActivity(
+              req.user.id,
+              req.user.username,
+              'CREATE',
+              'User',
+              result.insertId,
+              fullName,
+              `Created new ${role} user: ${username}`
+            );
 
             res.status(201).json({
               message: "User created successfully",
@@ -1149,7 +1134,7 @@ app.post("/api/admin/users", requireAdmin, async (req, res) => {
 app.post("/api/admin/users/:id/ban", requireAdmin, (req, res) => {
   const { id } = req.params;
   const { reason } = req.body;
-  const bannedBy = req.user && req.user.id;
+  const bannedBy = req.user.id;
 
   if (id == bannedBy) {
     return res.status(400).json({ message: "Cannot ban yourself" });
@@ -1207,7 +1192,7 @@ app.post("/api/admin/users/:id/unban", requireAdmin, (req, res) => {
 
 app.delete("/api/admin/users/:id", requireAdmin, (req, res) => {
   const { id } = req.params;
-  const adminId = req.user && req.user.id;
+  const adminId = req.user.id;
 
   if (parseInt(id) === adminId) {
     return res.status(400).json({ message: "Cannot delete your own account" });
@@ -1237,8 +1222,8 @@ app.delete("/api/admin/users/:id", requireAdmin, (req, res) => {
       }
 
       logActivity(
-        req.user && req.user.id,
-        req.user && req.user.username,
+        req.user.id,
+        req.user.username,
         'DELETE',
         'User',
         id,
@@ -1251,13 +1236,12 @@ app.delete("/api/admin/users/:id", requireAdmin, (req, res) => {
   });
 });
 
-// Helper function to log activity
 function logActivity(userId, username, action, entityType, entityId, entityName, description = null) {
   const query = `
     INSERT INTO ActivityLog (userId, username, action, entityType, entityId, entityName, description)
     VALUES (?, ?, ?, ?, ?, ?, ?)
   `;
-  
+
   db.query(query, [userId, username, action, entityType, entityId, entityName, description], (err) => {
     if (err) {
       console.error('Error logging activity:', err);
@@ -1265,7 +1249,6 @@ function logActivity(userId, username, action, entityType, entityId, entityName,
   });
 }
 
-// Clean up activities older than 12 hours
 function cleanupOldActivities() {
   const query = 'DELETE FROM ActivityLog WHERE timestamp < DATE_SUB(NOW(), INTERVAL 12 HOUR)';
   db.query(query, (err, result) => {
@@ -1277,17 +1260,15 @@ function cleanupOldActivities() {
   });
 }
 
-// Run cleanup every hour
 setInterval(cleanupOldActivities, 60 * 60 * 1000);
 
 app.get("/api/admin/activities", requireAdmin, (req, res) => {
   const limit = parseInt(req.query.limit) || 50;
 
-  // Clean up old activities first
   cleanupOldActivities();
 
   const query = `
-    SELECT 
+    SELECT
       id,
       userId,
       username,
@@ -1312,10 +1293,6 @@ app.get("/api/admin/activities", requireAdmin, (req, res) => {
     res.json({ activities });
   });
 });
-
-// ============================================
-// SHARED ROUTES - Instructor Management
-// ============================================
 
 app.get("/api/instructors", requireAuth, (req, res) => {
   db.query("SELECT * FROM Instructors", (err, results) => {
@@ -1364,12 +1341,10 @@ app.put("/api/instructors/:id", requireAdmin, (req, res) => {
   );
 });
 
-// Get instructors for a student's enrolled courses
 app.get("/api/students/:id/instructors", requireAuth, (req, res) => {
   const { id } = req.params;
 
-  // Students can only view their own instructors
-  if (req.user && req.user.role === 'Student') {
+  if (req.user.role === 'Student') {
     db.query(
       "SELECT id FROM Students WHERE userId = ?",
       [req.user.id],
@@ -1387,7 +1362,7 @@ app.get("/api/students/:id/instructors", requireAuth, (req, res) => {
 
 function fetchStudentInstructors(studentId, res) {
   const query = `
-    SELECT DISTINCT 
+    SELECT DISTINCT
       i.id,
       i.firstName,
       i.lastName,
@@ -1415,13 +1390,11 @@ function fetchStudentInstructors(studentId, res) {
   });
 }
 
-// Get students enrolled in an instructor's courses
 app.get("/api/instructors/:id/students", requireAuth, (req, res) => {
   const { id } = req.params;
   const { courseId } = req.query;
 
-  // Instructors can only view their own students
-  if (req.user && req.user.role === 'Instructor') {
+  if (req.user.role === 'Instructor') {
     db.query(
       "SELECT id FROM Instructors WHERE userId = ?",
       [req.user.id],
@@ -1439,7 +1412,7 @@ app.get("/api/instructors/:id/students", requireAuth, (req, res) => {
 
 function fetchInstructorStudents(instructorId, courseId, res) {
   let query = `
-    SELECT DISTINCT 
+    SELECT DISTINCT
       s.id as studentId,
       u.firstName,
       u.lastName,
@@ -1489,14 +1462,10 @@ app.delete("/api/instructors/:id", requireAdmin, (req, res) => {
   });
 });
 
-// ============================================
-// QUIZ ROUTES (Student & Instructor)
-// ============================================
-
 app.get("/api/quizzes", requireAuth, (req, res) => {
   const { courseId } = req.query;
-  const userId = req.user && req.user.id;
-  const userRole = req.user && req.user.role;
+  const userId = req.user.id;
+  const userRole = req.user.role;
 
   if (userRole === 'Admin') {
     let query = "SELECT * FROM Quizzes WHERE 1=1";
@@ -1516,7 +1485,7 @@ app.get("/api/quizzes", requireAuth, (req, res) => {
     });
   } else if (userRole === 'Instructor') {
     let query = `
-      SELECT DISTINCT q.* 
+      SELECT DISTINCT q.*
       FROM Quizzes q
       JOIN Courses c ON q.courseId = c.id
       JOIN CourseInstructors ci ON c.id = ci.courseId
@@ -1546,7 +1515,7 @@ app.get("/api/quizzes", requireAuth, (req, res) => {
       const studentId = studentResult[0].id;
 
       let query = `
-        SELECT DISTINCT q.* 
+        SELECT DISTINCT q.*
         FROM Quizzes q
         JOIN Courses c ON q.courseId = c.id
         JOIN Enrollments e ON c.id = e.courseId
@@ -1572,508 +1541,17 @@ app.get("/api/quizzes", requireAuth, (req, res) => {
   }
 });
 
-app.post("/api/quizzes", requireAdmin, (req, res) => {
-  const { courseId, title, description, dueDate, totalPoints } = req.body;
-
-  if (!courseId || !title) {
-    return res.status(400).json({ message: "Course ID and title are required" });
-  }
-
-  db.query(
-    "INSERT INTO Quizzes (courseId, title, description, dueDate, totalPoints) VALUES (?, ?, ?, ?, ?)",
-    [courseId, title, description || null, dueDate || null, totalPoints || 100],
-    (err, result) => {
-      if (err) {
-        console.error(err);
-        return res.status(500).json({ message: "Failed to create quiz" });
-      }
-      res.status(201).json({ message: "Quiz created successfully", quizId: result.insertId });
-    }
-  );
-});
-
-app.put("/api/quizzes/:id", requireAdmin, (req, res) => {
-  const { id } = req.params;
-  const { title, description, dueDate, totalPoints } = req.body;
-
-  db.query(
-    "UPDATE Quizzes SET title = ?, description = ?, dueDate = ?, totalPoints = ? WHERE id = ?",
-    [title, description, dueDate, totalPoints, id],
-    (err) => {
-      if (err) {
-        console.error(err);
-        return res.status(500).json({ message: "Failed to update quiz" });
-      }
-      res.json({ message: "Quiz updated successfully" });
-    }
-  );
-});
-
-app.delete("/api/quizzes/:id", requireAdmin, (req, res) => {
-  const { id } = req.params;
-
-  db.query("DELETE FROM Quizzes WHERE id = ?", [id], (err) => {
-    if (err) {
-      console.error(err);
-      return res.status(500).json({ message: "Failed to delete quiz" });
-    }
-    res.json({ message: "Quiz deleted successfully" });
-  });
-});
-
-app.get("/api/quizzes/:id/questions", requireAuth, (req, res) => {
-  const { id } = req.params;
-  const userRole = req.user && req.user.role;
-
-  let selectFields = "id, questionText, points";
-  if (userRole === 'Admin' || userRole === 'Instructor') {
-    selectFields = "id, questionText, correctAnswer, points";
-  }
-
-  db.query(
-    `SELECT ${selectFields} FROM QuizQuestions WHERE quizId = ? ORDER BY id`,
-    [id],
-    (err, results) => {
-      if (err) {
-        console.error(err);
-        return res.status(500).json({ message: "Failed to fetch questions" });
-      }
-      res.json({ questions: results });
-    }
-  );
-});
-
-app.post("/api/quizzes/:id/questions", requireAuth, (req, res) => {
-  const { id } = req.params;
-  const { questionText, correctAnswer, points } = req.body;
-
-  if (!questionText || correctAnswer === undefined) {
-    return res.status(400).json({ message: "Question text and correct answer are required" });
-  }
-
-  db.query(
-    "INSERT INTO QuizQuestions (quizId, questionText, correctAnswer, points) VALUES (?, ?, ?, ?)",
-    [id, questionText, correctAnswer, points || 10],
-    (err, result) => {
-      if (err) {
-        console.error(err);
-        return res.status(500).json({ message: "Failed to add question" });
-      }
-      res.json({ message: "Question added successfully", questionId: result.insertId });
-    }
-  );
-});
-
-app.put("/api/quizzes/:quizId/questions/:questionId", requireAuth, (req, res) => {
-  const { questionId } = req.params;
-  const { questionText, correctAnswer, points } = req.body;
-
-  db.query(
-    "UPDATE QuizQuestions SET questionText = ?, correctAnswer = ?, points = ? WHERE id = ?",
-    [questionText, correctAnswer, points, questionId],
-    (err) => {
-      if (err) {
-        console.error(err);
-        return res.status(500).json({ message: "Failed to update question" });
-      }
-      res.json({ message: "Question updated successfully" });
-    }
-  );
-});
-
-app.delete("/api/quizzes/:quizId/questions/:questionId", requireAuth, (req, res) => {
-  const { questionId } = req.params;
-
-  db.query(
-    "DELETE FROM QuizQuestions WHERE id = ?",
-    [questionId],
-    (err) => {
-      if (err) {
-        console.error(err);
-        return res.status(500).json({ message: "Failed to delete question" });
-      }
-      res.json({ message: "Question deleted successfully" });
-    }
-  );
-});
-
-app.post("/api/quizzes/:id/grade/:studentId", requireAuth, (req, res) => {
-  const { id, studentId } = req.params;
-
-  const gradeQuery = `
-    SELECT 
-      qa.questionId,
-      qa.answer as studentAnswer,
-      qq.correctAnswer,
-      qq.points,
-      CASE WHEN qa.answer = qq.correctAnswer THEN qq.points ELSE 0 END as earnedPoints
-    FROM QuizAnswers qa
-    JOIN QuizQuestions qq ON qa.questionId = qq.id
-    WHERE qa.quizId = ? AND qa.studentId = ?
-  `;
-
-  db.query(gradeQuery, [id, studentId], (err, results) => {
-    if (err) {
-      console.error(err);
-      return res.status(500).json({ message: "Failed to grade quiz" });
-    }
-
-    const totalScore = results.reduce((sum, r) => sum + r.earnedPoints, 0);
-
-    db.query(
-      "UPDATE QuizAnswers qa JOIN QuizQuestions qq ON qa.questionId = qq.id SET qa.isCorrect = (qa.answer = qq.correctAnswer) WHERE qa.quizId = ? AND qa.studentId = ?",
-      [id, studentId],
-      (err2) => {
-        if (err2) {
-          console.error(err2);
-          return res.status(500).json({ message: "Failed to update answers" });
-        }
-
-        db.query(
-          "UPDATE QuizSubmissions SET score = ? WHERE quizId = ? AND studentId = ?",
-          [totalScore, id, studentId],
-          (err3) => {
-            if (err3) {
-              console.error(err3);
-              return res.status(500).json({ message: "Failed to update score" });
-            }
-            res.json({ 
-              message: "Quiz graded successfully", 
-              score: totalScore,
-              totalQuestions: results.length,
-              correctAnswers: results.filter(r => r.earnedPoints > 0).length
-            });
-          }
-        );
-      }
-    );
-  });
-});
-
-app.put("/api/quiz-submissions/:id/score", requireAuth, (req, res) => {
-  const { id } = req.params;
-  const { score } = req.body;
-
-  if (score === undefined || score < 0) {
-    return res.status(400).json({ message: "Valid score is required" });
-  }
-
-  db.query(
-    "UPDATE QuizSubmissions SET score = ? WHERE id = ?",
-    [score, id],
-    (err) => {
-      if (err) {
-        console.error(err);
-        return res.status(500).json({ message: "Failed to update score" });
-      }
-      res.json({ message: "Score updated successfully" });
-    }
-  );
-});
-
-app.get("/api/instructor/quiz-submissions/:quizId", requireAuth, (req, res) => {
-  const { quizId } = req.params;
-
-  const query = `
-    SELECT 
-      qs.id as submissionId,
-      qs.studentId,
-      qs.score,
-      qs.submittedAt,
-      u.firstName,
-      u.lastName,
-      u.email,
-      q.totalPoints,
-      q.passingScore,
-      (SELECT COUNT(*) FROM QuizAnswers WHERE quizId = qs.quizId AND studentId = qs.studentId) as answersCount,
-      (SELECT COUNT(*) FROM QuizAnswers qa JOIN QuizQuestions qq ON qa.questionId = qq.id WHERE qa.quizId = qs.quizId AND qa.studentId = qs.studentId AND qa.answer = qq.correctAnswer) as correctCount,
-      CASE 
-        WHEN qs.score IS NULL THEN 'Pending'
-        WHEN qs.score >= q.passingScore THEN 'Pass'
-        ELSE 'Fail'
-      END as status
-    FROM QuizSubmissions qs
-    JOIN Students s ON qs.studentId = s.id
-    JOIN Users u ON s.userId = u.id
-    JOIN Quizzes q ON qs.quizId = q.id
-    WHERE qs.quizId = ?
-    ORDER BY qs.submittedAt DESC
-  `;
-
-  db.query(query, [quizId], (err, results) => {
-    if (err) {
-      console.error(err);
-      return res.status(500).json({ message: "Failed to fetch submissions" });
-    }
-    res.json({ submissions: results });
-  });
-});
-
-app.get("/api/instructor/student-answers/:quizId/:studentId", requireAuth, (req, res) => {
-  const { quizId, studentId } = req.params;
-
-  const query = `
-    SELECT 
-      qa.id,
-      qa.questionId,
-      qa.answer as studentAnswer,
-      qa.isCorrect,
-      qq.questionText,
-      qq.correctAnswer,
-      qq.points
-    FROM QuizAnswers qa
-    JOIN QuizQuestions qq ON qa.questionId = qq.id
-    WHERE qa.quizId = ? AND qa.studentId = ?
-    ORDER BY qq.id
-  `;
-
-  db.query(query, [quizId, studentId], (err, results) => {
-    if (err) {
-      console.error(err);
-      return res.status(500).json({ message: "Failed to fetch answers" });
-    }
-    res.json({ answers: results });
-  });
-});
-
-app.post("/api/quizzes/:id/submit", requireAuth, (req, res) => {
-  const { id } = req.params;
-  const { answers } = req.body;
-  const userId = req.user && req.user.id;
-
-  db.query("SELECT id FROM Students WHERE userId = ?", [userId], (err, studentResult) => {
-    if (err || studentResult.length === 0) {
-      return res.status(404).json({ message: "Student not found" });
-    }
-
-    const studentId = studentResult[0].id;
-
-    db.query(
-      "DELETE FROM QuizAnswers WHERE quizId = ? AND studentId = ?",
-      [id, studentId],
-      (err2) => {
-        if (err2) {
-          console.error(err2);
-          return res.status(500).json({ message: "Database error" });
-        }
-
-        if (!answers || answers.length === 0) {
-          return res.status(400).json({ message: "No answers provided" });
-        }
-
-        const answerValues = answers.map(a => [id, studentId, a.questionId, a.answer]);
-
-        db.query(
-          "INSERT INTO QuizAnswers (quizId, studentId, questionId, answer) VALUES ?",
-          [answerValues],
-          (err3) => {
-            if (err3) {
-              console.error(err3);
-              return res.status(500).json({ message: "Failed to submit answers" });
-            }
-
-            db.query(
-              "SELECT * FROM QuizSubmissions WHERE quizId = ? AND studentId = ?",
-              [id, studentId],
-              (err4, existing) => {
-                if (err4) {
-                  console.error(err4);
-                  return res.status(500).json({ message: "Database error" });
-                }
-
-                if (existing.length === 0) {
-                  db.query(
-                    "INSERT INTO QuizSubmissions (quizId, studentId, score, submittedAt) VALUES (?, ?, NULL, NOW())",
-                    [id, studentId],
-                    (err5) => {
-                      if (err5) {
-                        console.error(err5);
-                        return res.status(500).json({ message: "Failed to create submission record" });
-                      }
-                      res.json({ message: "Quiz submitted successfully. Waiting for instructor grading." });
-                    }
-                  );
-                } else {
-                  db.query(
-                    "UPDATE QuizSubmissions SET submittedAt = NOW(), score = NULL WHERE quizId = ? AND studentId = ?",
-                    [id, studentId],
-                    (err5) => {
-                      if (err5) {
-                        console.error(err5);
-                      }
-                      res.json({ message: "Quiz resubmitted successfully. Waiting for instructor grading." });
-                    }
-                  );
-                }
-              }
-            );
-          }
-        );
-      }
-    );
-  });
-});
-
-app.get("/api/student/quiz-submissions", requireAuth, (req, res) => {
-  const userId = req.user && req.user.id;
-
-  db.query("SELECT id FROM Students WHERE userId = ?", [userId], (err, studentResult) => {
-    if (err || studentResult.length === 0) {
-      return res.status(404).json({ message: "Student not found" });
-    }
-
-    const studentId = studentResult[0].id;
-
-    const query = `
-      SELECT 
-        qs.id,
-        qs.quizId,
-        qs.score,
-        qs.submittedAt,
-        q.title as quizTitle,
-        q.totalPoints,
-        q.passingScore,
-        c.name as courseName,
-        c.code as courseCode,
-        CASE 
-          WHEN qs.score IS NULL THEN 'Pending'
-          WHEN qs.score >= q.passingScore THEN 'Pass'
-          ELSE 'Fail'
-        END as status,
-        (SELECT COUNT(*) FROM QuizAnswers WHERE quizId = qs.quizId AND studentId = qs.studentId) as hasAnswers
-      FROM QuizSubmissions qs
-      JOIN Quizzes q ON qs.quizId = q.id
-      JOIN Courses c ON q.courseId = c.id
-      WHERE qs.studentId = ?
-      ORDER BY qs.submittedAt DESC
-    `;
-
-    db.query(query, [studentId], (err2, results) => {
-      if (err2) {
-        console.error(err2);
-        return res.status(500).json({ message: "Failed to fetch submissions" });
-      }
-      res.json({ submissions: results });
-    });
-  });
-});
-
-app.get("/api/quizzes/:id/my-answers", requireAuth, (req, res) => {
-  const { id } = req.params;
-  const userId = req.user && req.user.id;
-
-  db.query("SELECT id FROM Students WHERE userId = ?", [userId], (err, studentResult) => {
-    if (err || studentResult.length === 0) {
-      return res.status(404).json({ message: "Student not found" });
-    }
-
-    const studentId = studentResult[0].id;
-
-    db.query(
-      "SELECT questionId, answer FROM QuizAnswers WHERE quizId = ? AND studentId = ?",
-      [id, studentId],
-      (err2, results) => {
-        if (err2) {
-          console.error(err2);
-          return res.status(500).json({ message: "Failed to fetch answers" });
-        }
-        res.json({ answers: results });
-      }
-    );
-  });
-});
-
-app.get("/api/instructor/quiz-results", requireAuth, (req, res) => {
-  const { quizId, courseId, instructorId } = req.query;
-  const userRole = req.user && req.user.role;
-  const userId = req.user && req.user.id;
-  
-  let query = `
-    SELECT 
-      qs.id as submissionId,
-      qs.quizId,
-      qs.studentId,
-      qs.score,
-      qs.submittedAt,
-      q.title as quizTitle,
-      q.totalPoints,
-      q.courseId,
-      c.name as courseName,
-      c.code as courseCode,
-      u.firstName,
-      u.lastName,
-      u.email,
-      CASE 
-        WHEN qs.score >= (q.totalPoints * 0.6) THEN 'Pass'
-        ELSE 'Fail'
-      END as status
-    FROM QuizSubmissions qs
-    JOIN Quizzes q ON qs.quizId = q.id
-    JOIN Students s ON qs.studentId = s.id
-    JOIN Users u ON s.userId = u.id
-    JOIN Courses c ON q.courseId = c.id
-  `;
-  
-  const params = [];
-  
-  // Instructors can only see their own courses
-  if (userRole === 'Instructor') {
-    query += `
-      JOIN CourseInstructors ci ON c.id = ci.courseId
-      JOIN Instructors i ON ci.instructorId = i.id
-      WHERE i.userId = ?
-    `;
-    params.push(userId);
-  } else {
-    query += " WHERE 1=1";
-  }
-  
-  // Admin can filter by instructor
-  if (userRole === 'Admin' && instructorId) {
-    query += ` AND EXISTS (
-      SELECT 1 FROM CourseInstructors ci2
-      WHERE ci2.courseId = c.id AND ci2.instructorId = ?
-    )`;
-    params.push(instructorId);
-  }
-  
-  if (quizId) {
-    query += " AND qs.quizId = ?";
-    params.push(quizId);
-  }
-  
-  if (courseId) {
-    query += " AND q.courseId = ?";
-    params.push(courseId);
-  }
-  
-  query += " ORDER BY qs.submittedAt DESC";
-  
-  db.query(query, params, (err, results) => {
-    if (err) {
-      console.error(err);
-      return res.status(500).json({ message: "Failed to fetch quiz results" });
-    }
-    res.json({ results });
-  });
-});
-
-// ============================================
-// INSTRUCTOR ROUTES - Dashboard & Quiz Results
-// ============================================
-
 app.get("/api/instructor/stats", requireAuth, (req, res) => {
-  const userId = req.user && req.user.id;
-  
+  const userId = req.user.id;
 
   db.query("SELECT id FROM instructors WHERE userId = ?", [userId], (err, instructorResult) => {
     if (err) {
       console.error(err);
       return res.status(500).json({ message: "Database error" });
     }
-    
+
     if (instructorResult.length === 0) {
-      return res.json({ 
+      return res.json({
         instructorCourses: 0,
         totalStudentsInCourses: 0,
         activeQuizzes: 0,
@@ -2081,59 +1559,55 @@ app.get("/api/instructor/stats", requireAuth, (req, res) => {
         failedStudents: 0
       });
     }
-    
+
     const instructorId = instructorResult[0].id;
-    
 
     const coursesQuery = `
-      SELECT COUNT(DISTINCT ci.courseId) as count 
+      SELECT COUNT(DISTINCT ci.courseId) as count
       FROM courseinstructors ci
       WHERE ci.instructorId = ?
     `;
-    
+
     db.query(coursesQuery, [instructorId], (err, coursesResult) => {
       if (err) {
         console.error(err);
         return res.status(500).json({ message: "Database error" });
       }
-      
+
       const instructorCourses = coursesResult[0].count;
-      
 
       const studentsQuery = `
-        SELECT COUNT(DISTINCT e.studentId) as count 
+        SELECT COUNT(DISTINCT e.studentId) as count
         FROM enrollments e
         JOIN courseinstructors ci ON e.courseId = ci.courseId
         WHERE ci.instructorId = ? AND e.status = 'Active'
       `;
-      
+
       db.query(studentsQuery, [instructorId], (err, studentsResult) => {
         if (err) {
           console.error(err);
           return res.status(500).json({ message: "Database error" });
         }
-        
+
         const totalStudentsInCourses = studentsResult[0].count;
-        
 
         const quizzesQuery = `
-          SELECT COUNT(*) as count 
+          SELECT COUNT(*) as count
           FROM quizzes q
           JOIN courseinstructors ci ON q.courseId = ci.courseId
           WHERE ci.instructorId = ?
         `;
-        
+
         db.query(quizzesQuery, [instructorId], (err, quizzesResult) => {
           if (err) {
             console.error(err);
             return res.status(500).json({ message: "Database error" });
           }
-          
+
           const activeQuizzes = quizzesResult[0].count;
-          
 
           const statsQuery = `
-            SELECT 
+            SELECT
               SUM(CASE WHEN qs.score IS NOT NULL AND qs.score >= (q.totalPoints * 0.6) THEN 1 ELSE 0 END) as passed,
               SUM(CASE WHEN qs.score IS NOT NULL AND qs.score < (q.totalPoints * 0.6) THEN 1 ELSE 0 END) as failed
             FROM quizsubmissions qs
@@ -2141,13 +1615,13 @@ app.get("/api/instructor/stats", requireAuth, (req, res) => {
             JOIN courseinstructors ci ON q.courseId = ci.courseId
             WHERE ci.instructorId = ? AND qs.score IS NOT NULL
           `;
-          
+
           db.query(statsQuery, [instructorId], (err, statsResult) => {
             if (err) {
               console.error(err);
               return res.status(500).json({ message: "Database error" });
             }
-            
+
             res.json({
               instructorCourses,
               totalStudentsInCourses,

@@ -1,9 +1,19 @@
 const API_BASE_URL = 'https://student-portal-owa4.onrender.com';
 
-// Simple fetch wrapper without complex authentication
+// JWT-based fetch wrapper
 const apiFetch = (url, options = {}) => {
-  // Include cookies/session credentials by default for same-origin or cross-origin (if server allows it)
-  const opts = { credentials: 'include', ...options };
+  const token = localStorage.getItem('token');
+  const headers = {
+    'Content-Type': 'application/json',
+    ...options.headers
+  };
+
+  // Don't add Authorization header for auth endpoints (login/register)
+  if (token && !url.includes('/login') && !url.includes('/register')) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  const opts = { ...options, headers };
   return fetch(url, opts);
 };
 
