@@ -33,9 +33,10 @@ A comprehensive web application for managing student enrollment, courses, quizze
 ### Backend
 - **Node.js** - JavaScript runtime
 - **Express.js** - Web framework
-- **MySQL** - Database
-- **bcryptjs** - Password hashing
-- **JWT** - Token-based authentication
+- **MySQL** - Relational database
+- **bcryptjs** - Password hashing (10 salt rounds)
+- **JWT (jsonwebtoken)** - Stateless token authentication
+- **CORS** - Cross-origin request handling
 
 ### DevOps
 - **GitHub Actions** - CI/CD automation
@@ -130,23 +131,43 @@ student-portal/
 
 ## 🔐 Authentication
 
-The application uses a simplified authentication system:
+The application uses **JWT (JSON Web Token) authentication** for secure, stateless authentication:
 
-### Default Users
+### How JWT Works
+1. User logs in with credentials
+2. Server validates credentials and returns a JWT token
+3. Client stores token in localStorage
+4. Token is automatically included in all API requests via `Authorization: Bearer <token>` header
+5. Server validates token signature and expiration on each request
+6. Token expires after 24 hours (user must login again)
+
+### Default Test Users
 - **Admin**: `admin` / `admin123`
 - **Student**: `student` / `student123`
 - **Instructor**: `instructor` / `instructor123`
 
-### User Roles
-1. **Admin**: Full system access
-2. **Instructor**: Course and quiz management
-3. **Student**: Enrollment and quiz participation
+### User Roles & Permissions
+1. **Admin**: 
+   - Full system access
+   - User management
+   - System statistics
+   - Activity logs
+2. **Instructor**: 
+   - Course and quiz management
+   - Grade submissions
+   - View enrolled students
+3. **Student**: 
+   - Enrollment in courses
+   - Quiz participation
+   - Grade and GPA tracking
 
 ## 📡 API Documentation
 
-### Authentication Endpoints
-- `POST /login` - User login
-- `POST /logout` - User logout
+### Autheregister` - Register new user (returns JWT token)
+- `POST /login` - User login (returns JWT token)
+- `POST /logout` - User logout (client-side token removal)
+- `GET /api/auth/validate` - Validate JWT token
+- `GET /api/auth/session` - Check authenticat
 - `GET /api/auth/session` - Check session status
 
 ### Student Endpoints
@@ -178,21 +199,38 @@ The backend is deployed on Render and accessible at:
 ## 🔧 Configuration
 
 ### Environment Variables
-Create `backend/Configurations.env`:
-```env
-NODE_ENV=production
+PORT=3001
 CORS_ORIGIN=https://anas43xq.github.io
-SESSION_SECRET=your-secret-key
-# Database
-DB_HOST=sql5.freesqldatabase.com
-DB_USER=sql5812469
-DB_PASSWORD=QB5vzAA7Qr
-DB_NAME=sql5812469
+
+# JWT Configuration
+JWT_SECRET=your-super-secret-jwt-key-change-in-production
+
+# Database Configuration
+DB_HOST=localhost
+DB_USER=root
+DB_PASSWORD=your_password
+DB_NAME=student_portal
 DB_PORT=3306
 
 # Other settings
-MAX_CREDITS_PER_SEMESTER=18
-BCRYPT_SALT_ROUNDS=10
+BCRYJWT Token Troubleshooting
+
+**Problem**: "Invalid or expired token" error
+- Clear localStorage: Open DevTools → Application → LocalStorage → Clear
+- Log out and log back in
+- Verify `JWT_SECRET` in `.env` file
+
+**Problem**: Token not being sent with requests
+- Check `apiFetch` function in `frontend/src/services/api.js`
+- Verify token exists in localStorage: `localStorage.getItem('token')`
+- Check Authorization header in Network tab of DevTools
+
+**Problem**: CORS errors on API calls
+- Verify `CORS_ORIGIN` in backend `.env` matches your frontend URL
+- Ensure both frontend and backend are running
+- Check backend is accessible (no firewall blocking)
+
+**Note**: JWT tokens are stored in localStorage (not cookies), so they work seamlessly across different origins without CORS cookie issues
 ```
 
 ### Running with the hosted (online) frontend
