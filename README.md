@@ -16,6 +16,3 @@ This repository contains the Student Portal frontend (React) and backend (Node.j
   - npm install
   - npm run build
 
-## Notes
-- I fixed several ESLint warnings and a few minor issues to make the frontend build cleanly.
-- The backend is untouched per your request; deploy it later when you're ready.
