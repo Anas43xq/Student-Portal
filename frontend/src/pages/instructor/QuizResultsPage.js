@@ -71,10 +71,8 @@ const QuizResultsPage = () => {
   }, [filterQuiz, filterCourse, filterInstructor]);
 
   useEffect(() => {
-    if (!loading) {
-      handleFilterChange();
-    }
-  }, [handleFilterChange, loading]);
+    handleFilterChange();
+  }, [handleFilterChange]);
 
 
   const filteredResults = results.filter(result => {
