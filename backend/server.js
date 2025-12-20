@@ -1045,6 +1045,7 @@ app.delete("/api/enrollments/:id", requireAuth, (req, res) => {
 
 app.get("/api/admin/stats", requireAdmin, (req, res) => {
   console.log('GET /api/admin/stats - origin:', req.headers.origin, 'user:', req.user && req.user.id);
+  console.log('SESSION USER at /api/admin/stats:', req.session && req.session.user);
   const stats = {};
 
   db.query("SELECT COUNT(*) as total FROM Students WHERE status = 'Active'", (err, results) => {
@@ -2162,6 +2163,6 @@ app.get("/api/instructor/stats", requireAuth, (req, res) => {
 });
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+app.listen(PORT, function () {
+  console.log('Server running on port ' + PORT);
 });
