@@ -921,15 +921,12 @@ app.post("/api/enrollments", requireAuth, (req, res) => {
             [courseId],
             (err, courseResults) => {
               if (err || courseResults.length === 0) {
-                return res.status(404).json({ message: "Course not found" });
-              }
+                    console.log(`Course ${courseId} not found`);
+                    return res.status(404).json({ message: "Course not found" });
+                  }
 
-              const courseCredits = courseResults[0].credits;
-              console.log(`Adding course ${courseId} (${courseCredits} credits). Total would be: ${currentCredits + courseCredits}`);
-
-              if (currentCredits + courseCredits > 18) {
-                return res.status(400).json({
-                  message: "Credit limit exceeded. Maximum 18 credits per semester.",
+                  const courseCredits = courseResults[0].credits;
+                  const course = courseResults[0];
                   currentCredits,
                   maxCredits: 18
                 });

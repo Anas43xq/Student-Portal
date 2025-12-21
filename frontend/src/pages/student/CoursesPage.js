@@ -145,7 +145,7 @@ const CoursesPage = () => {
         studentId: user.studentId,
         courseId: course.id,
         semester: currentSemester,
-        year: 2025
+        year: course.year || new Date().getFullYear()
       };
       console.log('Enrollment request:', enrollmentData);
       console.log('Current credits:', currentCredits, 'Course credits:', course.credits);
