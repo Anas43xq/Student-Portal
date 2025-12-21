@@ -882,6 +882,8 @@ function executeEnrollmentQuery(query, params, status, res) {
 app.post("/api/enrollments", requireAuth, (req, res) => {
   const { studentId, courseId, semester, year } = req.body;
 
+  console.log('Enrollment POST received:', { studentId, courseId, semester, year });
+
   if (!studentId || !courseId || !semester || !year) {
     return res.status(400).json({ message: "Required fields missing" });
   }

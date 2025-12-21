@@ -141,18 +141,23 @@ const CoursesPage = () => {
 
     setEnrolling(true);
     try {
-      await enrollmentsAPI.create({
+      const enrollmentData = {
         studentId: user.studentId,
         courseId: course.id,
         semester: currentSemester,
         year: 2025
-      });
+      };
+      console.log('Enrollment request:', enrollmentData);
+      console.log('Current credits:', currentCredits, 'Course credits:', course.credits);
+      
+      await enrollmentsAPI.create(enrollmentData);
       
       alert(`Successfully registered for ${course.code} - ${course.name}!`);
       await fetchStudentEnrollments();
       await fetchCourses();
     } catch (err) {
       console.error('Enrollment error:', err);
+      console.error('Error details:', err.message);
       alert(err.message || 'Failed to enroll in course');
     } finally {
       setEnrolling(false);
