@@ -882,83 +882,54 @@ function executeEnrollmentQuery(query, params, status, res) {
 app.post("/api/enrollments", requireAuth, (req, res) => {
   const { studentId, courseId, semester, year } = req.body;
 
-  console.log('Enrollment POST received:', { studentId, courseId, semester, year });
-
   if (!studentId || !courseId || !semester || !year) {
     return res.status(400).json({ message: "Required fields missing" });
   }
 
+  // Step 1: Check if already enrolled
   db.query(
-    "SELECT * FROM Enrollments WHERE studentId = ? AND courseId = ? AND semester = ? AND year = ?",
+    "SELECT id FROM Enrollments WHERE studentId = ? AND courseId = ? AND semester = ? AND year = ?",
     [studentId, courseId, semester, year],
-    (err, results) => {
-      if (err) {
-        console.error(err);
-        return res.status(500).json({ message: "Database error" });
-      }
-
-      if (results.length > 0) {
+    (err, enrolled) => {
+      if (err) return res.status(500).json({ message: "Database error" });
+      if (enrolled.length > 0) {
         return res.status(400).json({ message: "Already enrolled in this course" });
       }
 
+      // Step 2: Check course capacity
       db.query(
-        `SELECT SUM(c.credits) as totalCredits
-         FROM Enrollments e
-         JOIN Courses c ON e.courseId = c.id
-         WHERE e.studentId = ? AND e.semester = ? AND e.year = ? AND e.status = 'Active'`,
-        [studentId, semester, year],
-        (err, creditResults) => {
-          if (err) {
-            console.error(err);
-            return res.status(500).json({ message: "Database error" });
+        "SELECT credits, capacity, currentEnrollment FROM Courses WHERE id = ?",
+        [courseId],
+        (err, courses) => {
+          if (err || courses.length === 0) {
+            return res.status(404).json({ message: "Course not found" });
           }
 
-          const currentCredits = creditResults[0].totalCredits || 0;
-          console.log(`Credit check: Student ${studentId}, ${semester} ${year}, Current: ${currentCredits}`);
+          const course = courses[0];
+          if (course.currentEnrollment >= course.capacity) {
+            return res.status(400).json({ message: "Course is full" });
+          }
 
+          // Step 3: Create enrollment
           db.query(
-            "SELECT credits FROM Courses WHERE id = ?",
-            [courseId],
-            (err, courseResults) => {
-              if (err || courseResults.length === 0) {
-                console.log(`Course ${courseId} not found`);
-                return res.status(404).json({ message: "Course not found" });
+            "INSERT INTO Enrollments (studentId, courseId, semester, year, status, enrolledAt) VALUES (?, ?, ?, ?, 'Active', NOW())",
+            [studentId, courseId, semester, year],
+            (err, result) => {
+              if (err) {
+                console.error('Enrollment creation error:', err);
+                return res.status(500).json({ message: "Failed to create enrollment" });
               }
 
-              const courseCredits = courseResults[0].credits;
-              console.log(`Adding course ${courseId} (${courseCredits} credits). Total would be: ${currentCredits + courseCredits}`);
-
-              if (currentCredits + courseCredits > 18) {
-                return res.status(400).json({
-                  message: "Credit limit exceeded. Maximum 18 credits per semester.",
-                  currentCredits,
-                  maxCredits: 18
-                });
-              }
-
+              // Step 4: Update course enrollment count
               db.query(
-                "INSERT INTO Enrollments (studentId, courseId, semester, year, status, enrolledAt) VALUES (?, ?, ?, ?, 'Active', NOW())",
-                [studentId, courseId, semester, year],
-                (err, result) => {
-                  if (err) {
-                    console.error('Enrollment creation error:', err);
-                    return res.status(500).json({ message: "Failed to create enrollment" });
-                  }
-
-                  db.query(
-                    "UPDATE Courses SET currentEnrollment = currentEnrollment + 1 WHERE id = ?",
-                    [courseId],
-                    (updateErr) => {
-                      if (updateErr) {
-                        console.error('Failed to update course enrollment count:', updateErr);
-                      }
-
-                      res.status(201).json({
-                        message: "Enrollment created successfully",
-                        enrollmentId: result.insertId
-                      });
-                    }
-                  );
+                "UPDATE Courses SET currentEnrollment = currentEnrollment + 1 WHERE id = ?",
+                [courseId],
+                (updateErr) => {
+                  if (updateErr) console.error('Failed to update course enrollment:', updateErr);
+                  res.status(201).json({
+                    message: "Enrollment created successfully",
+                    enrollmentId: result.insertId
+                  });
                 }
               );
             }
