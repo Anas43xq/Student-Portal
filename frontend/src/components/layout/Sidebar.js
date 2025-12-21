@@ -11,9 +11,7 @@ const Sidebar = ({ currentPage, onNavigate, isOpen, onClose }) => {
     { id: 'students', label: 'Students', icon: Users, roles: ['Admin'] },
     { id: 'courses', label: 'Courses', icon: BookOpen, roles: ['Student', 'Admin', 'Instructor'] },
     { id: 'instructors', label: 'Instructors', icon: GraduationCap, roles: ['Student', 'Admin'] },
-    { id: 'quizzes', label: 'Quizzes', icon: FileText, roles: ['Student', 'Admin', 'Instructor'] },
-    { id: 'quiz-results', label: 'Quiz Results', icon: CheckCircle, roles: ['Instructor', 'Admin'] },
-    { id: 'enrollments', label: 'Enrollments', icon: Calendar, roles: ['Admin', 'Instructor'] },
+    { id: 'enrollments', label: 'Enrollments', icon: Calendar, roles: ['Admin'] },
     { id: 'admin', label: 'Admin Panel', icon: UserCheck, roles: ['Admin'] },
   ];
 

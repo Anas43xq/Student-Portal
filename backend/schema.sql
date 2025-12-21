@@ -5,11 +5,11 @@
 
 SET FOREIGN_KEY_CHECKS = 0;
 
+DROP VIEW IF EXISTS EnrollmentDetails;
+DROP VIEW IF EXISTS CourseDetails;
+DROP VIEW IF EXISTS StudentDetails;
+
 DROP TABLE IF EXISTS ActivityLog;
-DROP TABLE IF EXISTS QuizAnswers;
-DROP TABLE IF EXISTS QuizQuestions;
-DROP TABLE IF EXISTS QuizSubmissions;
-DROP TABLE IF EXISTS Quizzes;
 DROP TABLE IF EXISTS CourseInstructors;
 DROP TABLE IF EXISTS Enrollments;
 DROP TABLE IF EXISTS Instructors;
@@ -32,7 +32,7 @@ CREATE TABLE Users (
   bannedAt TIMESTAMP NULL DEFAULT NULL,
   bannedBy INT NULL DEFAULT NULL,
   banReason VARCHAR(500) DEFAULT NULL,
-  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  createdAt DATETIME,
   updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (bannedBy) REFERENCES Users(id) ON DELETE SET NULL,
   INDEX idx_username (username),
@@ -59,7 +59,7 @@ CREATE TABLE Students (
   gpa DECIMAL(3,2) DEFAULT NULL,
   totalCredits INT DEFAULT 0,
   status ENUM('Active', 'Inactive', 'Graduated', 'Suspended') DEFAULT 'Active',
-  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  createdAt DATETIME,
   updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (userId) REFERENCES Users(id) ON DELETE CASCADE,
   INDEX idx_userId (userId),
@@ -82,7 +82,7 @@ CREATE TABLE Courses (
   description TEXT DEFAULT NULL,
   capacity INT DEFAULT 30,
   currentEnrollment INT DEFAULT 0,
-  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  createdAt DATETIME,
   updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   INDEX idx_code (code),
   INDEX idx_department (department),
@@ -103,7 +103,7 @@ CREATE TABLE Enrollments (
   year INT NOT NULL,
   grade VARCHAR(2) DEFAULT NULL,
   status ENUM('Active', 'Completed', 'Dropped', 'Withdrawn', 'Failed') DEFAULT 'Active',
-  enrolledAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  enrolledAt DATETIME,
   updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (studentId) REFERENCES Students(id) ON DELETE CASCADE,
   FOREIGN KEY (courseId) REFERENCES Courses(id) ON DELETE CASCADE,
@@ -128,7 +128,7 @@ CREATE TABLE Instructors (
   title VARCHAR(50) DEFAULT 'Professor',
   phone VARCHAR(20) DEFAULT NULL,
   officeLocation VARCHAR(100) DEFAULT NULL,
-  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  createdAt DATETIME,
   updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (userId) REFERENCES Users(id) ON DELETE SET NULL,
   INDEX idx_userId (userId),
@@ -144,72 +144,12 @@ CREATE TABLE CourseInstructors (
   courseId INT NOT NULL,
   instructorId INT NOT NULL,
   role ENUM('Primary', 'Secondary', 'TA') DEFAULT 'Primary',
-  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  createdAt DATETIME,
   FOREIGN KEY (courseId) REFERENCES Courses(id) ON DELETE CASCADE,
   FOREIGN KEY (instructorId) REFERENCES Instructors(id) ON DELETE CASCADE,
   UNIQUE KEY unique_assignment (courseId, instructorId),
   INDEX idx_courseId (courseId),
   INDEX idx_instructorId (instructorId)
-);
-
-CREATE TABLE Quizzes (
-  id INT PRIMARY KEY AUTO_INCREMENT,
-  courseId INT NOT NULL,
-  title VARCHAR(200) NOT NULL,
-  description TEXT DEFAULT NULL,
-  dueDate DATETIME DEFAULT NULL,
-  totalPoints INT NOT NULL DEFAULT 100,
-  passingScore INT DEFAULT 60,
-  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (courseId) REFERENCES Courses(id) ON DELETE CASCADE,
-  INDEX idx_courseId (courseId),
-  INDEX idx_dueDate (dueDate),
-  CONSTRAINT chk_total_points CHECK (totalPoints > 0),
-  CONSTRAINT chk_passing_score CHECK (passingScore >= 0 AND passingScore <= totalPoints)
-);
-
-CREATE TABLE QuizQuestions (
-  id INT PRIMARY KEY AUTO_INCREMENT,
-  quizId INT NOT NULL,
-  questionText TEXT NOT NULL,
-  correctAnswer VARCHAR(500) DEFAULT NULL,
-  points INT NOT NULL DEFAULT 1,
-  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updatedAt TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (quizId) REFERENCES Quizzes(id) ON DELETE CASCADE,
-  INDEX idx_quizId (quizId)
-);
-
-CREATE TABLE QuizAnswers (
-  id INT PRIMARY KEY AUTO_INCREMENT,
-  quizId INT NOT NULL,
-  studentId INT NOT NULL,
-  questionId INT NOT NULL,
-  answer VARCHAR(500) DEFAULT NULL,
-  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updatedAt TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (quizId) REFERENCES Quizzes(id) ON DELETE CASCADE,
-  FOREIGN KEY (studentId) REFERENCES Students(id) ON DELETE CASCADE,
-  FOREIGN KEY (questionId) REFERENCES QuizQuestions(id) ON DELETE CASCADE,
-  INDEX idx_quizId (quizId),
-  INDEX idx_studentId (studentId),
-  INDEX idx_questionId (questionId)
-);
-
-CREATE TABLE QuizSubmissions (
-  id INT PRIMARY KEY AUTO_INCREMENT,
-  quizId INT NOT NULL,
-  studentId INT NOT NULL,
-  score INT NOT NULL DEFAULT 0,
-  submittedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (quizId) REFERENCES Quizzes(id) ON DELETE CASCADE,
-  FOREIGN KEY (studentId) REFERENCES Students(id) ON DELETE CASCADE,
-  UNIQUE KEY unique_submission (quizId, studentId),
-  INDEX idx_quizId (quizId),
-  INDEX idx_studentId (studentId),
-  INDEX idx_submittedAt (submittedAt)
 );
 
 -- ============================================
@@ -220,11 +160,11 @@ CREATE TABLE ActivityLog (
   userId INT DEFAULT NULL,
   username VARCHAR(50) DEFAULT NULL,
   action ENUM('CREATE', 'UPDATE', 'DELETE') NOT NULL,
-  entityType ENUM('User', 'Student', 'Course', 'Enrollment', 'Instructor', 'Quiz') NOT NULL,
+  entityType ENUM('User', 'Student', 'Course', 'Enrollment', 'Instructor') NOT NULL,
   entityId INT DEFAULT NULL,
   entityName VARCHAR(255) DEFAULT NULL,
   description TEXT DEFAULT NULL,
-  timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  timestamp DATETIME,
   FOREIGN KEY (userId) REFERENCES Users(id) ON DELETE SET NULL,
   INDEX idx_timestamp (timestamp),
   INDEX idx_entityType (entityType),
@@ -334,148 +274,6 @@ INSERT INTO CourseInstructors (courseId, instructorId, role) VALUES
 (11, 7, 'Primary'),
 (12, 8, 'Primary');
 
-INSERT INTO Quizzes (courseId, title, description, dueDate, totalPoints, passingScore) VALUES
-(1, 'Python Basics Quiz', 'Test your understanding of Python fundamentals', '2025-10-15 23:59:59', 100, 60),
-(1, 'Functions and Loops', 'Quiz on functions, loops, and control structures', '2025-11-01 23:59:59', 100, 60),
-(1, 'OOP Concepts', 'Object-oriented programming in Python', '2025-11-15 23:59:59', 100, 60),
-(2, 'Data Structures Midterm', 'Comprehensive test on arrays, linked lists, and trees', '2025-10-20 23:59:59', 150, 90),
-(2, 'Algorithms Quiz', 'Sorting and searching algorithms', '2025-11-12 23:59:59', 100, 60),
-(4, 'HTML & CSS Quiz', 'Web development fundamentals', '2025-10-25 23:59:59', 100, 60),
-(4, 'JavaScript Basics', 'Introduction to JavaScript programming', '2025-11-08 23:59:59', 100, 60),
-(5, 'Business Principles Test', 'Core business management concepts', '2025-11-05 23:59:59', 100, 60),
-(5, 'Leadership Quiz', 'Management and leadership styles', '2025-11-18 23:59:59', 100, 60),
-(7, 'Psychology Basics', 'Introduction to psychological theories', '2025-10-30 23:59:59', 100, 60),
-(7, 'Behavioral Psychology', 'Understanding human behavior', '2025-11-20 23:59:59', 100, 60),
-(9, 'Statics Quiz', 'Forces and equilibrium', '2025-10-28 23:59:59', 100, 60),
-(9, 'Dynamics Test', 'Motion and acceleration', '2025-11-14 23:59:59', 100, 60),
-(10, 'Calculus Quiz 1', 'Derivatives and limits', '2025-10-18 23:59:59', 100, 60),
-(10, 'Integration Test', 'Definite and indefinite integrals', '2025-11-11 23:59:59', 100, 60),
-(12, 'Statistics Midterm', 'Probability distributions and hypothesis testing', '2025-11-10 23:59:59', 150, 90),
-(12, 'Probability Quiz', 'Basic probability concepts', '2025-10-22 23:59:59', 100, 60);
-
-INSERT INTO QuizSubmissions (quizId, studentId, score) VALUES
--- CS101 quizzes (quizId 1,2,3)
-(1, 1, 85), (2, 1, 78), (3, 1, 92),
-(1, 2, 72), (2, 2, 68),
-(1, 4, 88), (2, 4, 91), (3, 4, 85),
-(1, 6, 95), (2, 6, 89), (3, 6, 93),
-(1, 8, 82), (2, 8, 86), (3, 8, 90),
-(1, 9, 75), (2, 9, 79),
-(1, 11, 65), (2, 11, 58),
-(1, 13, 78), (2, 13, 74), (3, 13, 80),
--- CS201 quizzes (quizId 4,5)
-(4, 1, 120), (5, 1, 82),
-(4, 5, 95), (5, 5, 78),
-(4, 6, 128), (5, 6, 88),
-(4, 8, 110), (5, 8, 85),
-(4, 10, 135), (5, 10, 92),
-(4, 13, 105), (5, 13, 75),
--- Web Dev quizzes (quizId 6,7)
-(6, 6, 92), (7, 6, 88),
-(6, 8, 95), (7, 8, 91),
-(6, 13, 78), (7, 13, 82),
--- Business quizzes (quizId 8,9)
-(8, 2, 88), (9, 2, 85),
-(8, 3, 82), (9, 3, 79),
-(8, 7, 75), (9, 7, 78),
-(8, 9, 90), (9, 9, 87),
-(8, 12, 94), (9, 12, 92),
-(8, 14, 86), (9, 14, 83),
--- Psychology quizzes (quizId 10,11)
-(10, 2, 80), (11, 2, 85),
-(10, 3, 95), (11, 3, 92),
-(10, 7, 82), (11, 7, 88),
-(10, 9, 78), (11, 9, 81),
-(10, 12, 91), (11, 12, 89),
-(10, 14, 93), (11, 14, 96),
--- Engineering quizzes (quizId 12,13)
-(12, 4, 85), (13, 4, 88),
-(12, 10, 92), (13, 10, 95),
-(12, 12, 80), (13, 12, 84),
-(12, 15, 78), (13, 15, 82),
--- Calculus quizzes (quizId 14,15)
-(14, 1, 82), (15, 1, 88),
-(14, 4, 95), (15, 4, 92),
-(14, 5, 85), (15, 5, 89),
-(14, 8, 78), (15, 8, 82),
-(14, 10, 90), (15, 10, 87),
-(14, 11, 72), (15, 11, 68),
-(14, 14, 88), (15, 14, 85),
-(14, 15, 75), (15, 15, 79),
--- Statistics quizzes (quizId 16,17)
-(16, 3, 125), (17, 3, 85),
-(16, 5, 135), (17, 5, 92),
-(16, 7, 95), (17, 7, 72),
-(16, 11, 88), (17, 11, 65),
-(16, 15, 118), (17, 15, 80);
-
-INSERT INTO QuizQuestions (quizId, questionText, correctAnswer, points) VALUES
--- Quiz 1 (Python Basics)
-(1, 'What is the output of print(2 + 2 * 2)?', '6', 1),
-(1, 'Which of the following is a valid variable name?', 'my_var', 1),
-(1, 'What does the input() function do?', 'Reads user input', 1),
--- Quiz 2 (Functions and Loops)
-(2, 'How do you define a function in Python?', 'def function_name():', 1),
-(2, 'What keyword is used to repeat a block of code?', 'while or for', 1),
-(2, 'What is the output of range(5)?', '0, 1, 2, 3, 4', 1),
--- Quiz 4 (Data Structures Midterm)
-(4, 'What is the time complexity of binary search?', 'O(log n)', 1),
-(4, 'Which data structure uses LIFO?', 'Stack', 1),
-(4, 'What is a linked list node?', 'Object containing data and pointer', 1),
--- Quiz 5 (Algorithms)
-(5, 'What is the worst-case time complexity of quicksort?', 'O(n^2)', 1),
-(5, 'Which sorting algorithm is stable?', 'Merge Sort', 1),
--- Quiz 6 (HTML & CSS)
-(6, 'What does HTML stand for?', 'HyperText Markup Language', 1),
-(6, 'How do you select an element by class in CSS?', '.classname', 1),
--- Quiz 7 (JavaScript)
-(7, 'What is the difference between let and var?', 'Scope and hoisting', 1),
-(7, 'How do you create a function in JavaScript?', 'function name() {}', 1),
--- Quiz 8 (Business Principles)
-(8, 'What are the four Ps of marketing?', 'Product, Price, Place, Promotion', 1),
-(8, 'What does SWOT stand for?', 'Strengths, Weaknesses, Opportunities, Threats', 1),
--- Quiz 9 (Leadership)
-(9, 'What is transformational leadership?', 'Leadership that inspires change', 1),
-(9, 'What is emotional intelligence?', 'Ability to recognize and manage emotions', 1),
--- Quiz 10 (Psychology Basics)
-(10, 'Who developed the theory of classical conditioning?', 'Ivan Pavlov', 1),
-(10, 'What is the psychological disorder characterized by excessive fear?', 'Anxiety Disorder', 1),
--- Quiz 11 (Behavioral Psychology)
-(11, 'What is positive reinforcement?', 'Adding a desirable consequence after behavior', 1),
-(11, 'Who is known for behaviorism?', 'B.F. Skinner', 1),
--- Quiz 12 (Statics)
-(12, 'In statics, what does equilibrium mean?', 'Net force is zero', 1),
-(12, 'What is the SI unit of force?', 'Newton', 1),
--- Quiz 13 (Dynamics)
-(13, 'What is Newtons second law?', 'F = ma', 1),
-(13, 'What is acceleration?', 'Change in velocity over time', 1),
--- Quiz 14 (Calculus)
-(14, 'What is the derivative of x^2?', '2x', 1),
-(14, 'What is the limit as x approaches 2 of (x^2 + 2)?', '6', 1),
--- Quiz 15 (Integration)
-(15, 'What is the integral of 2x?', 'x^2 + C', 1),
-(15, 'What does the constant C represent in integration?', 'Constant of integration', 1),
--- Quiz 16 (Statistics)
-(16, 'What is standard deviation?', 'Measure of spread from mean', 1),
-(16, 'In a normal distribution, what percentage falls within 1 standard deviation?', '68%', 1),
--- Quiz 17 (Probability)
-(17, 'What is the probability of rolling a 6 on a fair die?', '1/6', 1),
-(17, 'What is the sum of all probabilities in a probability distribution?', '1', 1);
-
-INSERT INTO QuizAnswers (quizId, studentId, questionId, answer) VALUES
--- Student 1 answers to Quiz 1 (Python Basics)
-(1, 1, 1, '6'),
-(1, 1, 2, 'my_var'),
-(1, 1, 3, 'Reads user input'),
--- Student 1 answers to Quiz 2 (Functions and Loops)
-(2, 1, 4, 'def function_name():'),
-(2, 1, 5, 'while or for'),
-(2, 1, 6, '0, 1, 2, 3, 4'),
--- Student 2 answers to Quiz 1
-(1, 2, 1, '8'),
-(1, 2, 2, 'my-var'),
-(1, 2, 3, 'Reads user input');
-
 INSERT INTO Enrollments (studentId, courseId, semester, year, grade, status) VALUES
 -- Student 1 (John Doe - CS)
 (1, 1, 'Fall', 2025, 'A', 'Active'),
@@ -538,76 +336,9 @@ INSERT INTO Enrollments (studentId, courseId, semester, year, grade, status) VAL
 (15, 10, 'Fall', 2025, 'B', 'Active'),
 (15, 12, 'Fall', 2025, 'A-', 'Active');
 
--- Insert Sample Quiz Questions
-INSERT INTO QuizQuestions (quizId, questionText, correctAnswer, points) VALUES
--- Quiz 1 (Python Basics)
-(1, 'What is the output of print(2 + 2 * 2)?', '6', 1),
-(1, 'Which of the following is a valid variable name?', 'my_var', 1),
-(1, 'What does the input() function do?', 'Reads user input', 1),
--- Quiz 2 (Functions and Loops)
-(2, 'How do you define a function in Python?', 'def function_name():', 1),
-(2, 'What keyword is used to repeat a block of code?', 'while or for', 1),
-(2, 'What is the output of range(5)?', '0, 1, 2, 3, 4', 1),
--- Quiz 4 (Data Structures Midterm)
-(4, 'What is the time complexity of binary search?', 'O(log n)', 1),
-(4, 'Which data structure uses LIFO?', 'Stack', 1),
-(4, 'What is a linked list node?', 'Object containing data and pointer', 1),
--- Quiz 5 (Algorithms)
-(5, 'What is the worst-case time complexity of quicksort?', 'O(n^2)', 1),
-(5, 'Which sorting algorithm is stable?', 'Merge Sort', 1),
--- Quiz 6 (HTML & CSS)
-(6, 'What does HTML stand for?', 'HyperText Markup Language', 1),
-(6, 'How do you select an element by class in CSS?', '.classname', 1),
--- Quiz 7 (JavaScript)
-(7, 'What is the difference between let and var?', 'Scope and hoisting', 1),
-(7, 'How do you create a function in JavaScript?', 'function name() {}', 1),
--- Quiz 8 (Business Principles)
-(8, 'What are the four Ps of marketing?', 'Product, Price, Place, Promotion', 1),
-(8, 'What does SWOT stand for?', 'Strengths, Weaknesses, Opportunities, Threats', 1),
--- Quiz 9 (Leadership)
-(9, 'What is transformational leadership?', 'Leadership that inspires change', 1),
-(9, 'What is emotional intelligence?', 'Ability to recognize and manage emotions', 1),
--- Quiz 10 (Psychology Basics)
-(10, 'Who developed the theory of classical conditioning?', 'Ivan Pavlov', 1),
-(10, 'What is the psychological disorder characterized by excessive fear?', 'Anxiety Disorder', 1),
--- Quiz 11 (Behavioral Psychology)
-(11, 'What is positive reinforcement?', 'Adding a desirable consequence after behavior', 1),
-(11, 'Who is known for behaviorism?', 'B.F. Skinner', 1),
--- Quiz 12 (Statics)
-(12, 'In statics, what does equilibrium mean?', 'Net force is zero', 1),
-(12, 'What is the SI unit of force?', 'Newton', 1),
--- Quiz 13 (Dynamics)
-(13, 'What is Newtons second law?', 'F = ma', 1),
-(13, 'What is acceleration?', 'Change in velocity over time', 1),
--- Quiz 14 (Calculus)
-(14, 'What is the derivative of x^2?', '2x', 1),
-(14, 'What is the limit as x approaches 2 of (x^2 + 2)?', '6', 1),
--- Quiz 15 (Integration)
-(15, 'What is the integral of 2x?', 'x^2 + C', 1),
-(15, 'What does the constant C represent in integration?', 'Constant of integration', 1),
--- Quiz 16 (Statistics)
-(16, 'What is standard deviation?', 'Measure of spread from mean', 1),
-(16, 'In a normal distribution, what percentage falls within 1 standard deviation?', '68%', 1),
--- Quiz 17 (Probability)
-(17, 'What is the probability of rolling a 6 on a fair die?', '1/6', 1),
-(17, 'What is the sum of all probabilities in a probability distribution?', '1', 1);
-
--- Insert Sample Quiz Answers (student submissions)
-INSERT INTO QuizAnswers (quizId, studentId, questionId, answer) VALUES
--- Student 1 answers to Quiz 1 (Python Basics)
-(1, 1, 1, '6'),
-(1, 1, 2, 'my_var'),
-(1, 1, 3, 'Reads user input'),
--- Student 1 answers to Quiz 2 (Functions and Loops)
-(2, 1, 4, 'def function_name():'),
-(2, 1, 5, 'while or for'),
-(2, 1, 6, '0, 1, 2, 3, 4'),
--- Student 2 answers to Quiz 1
-(1, 2, 1, '8'),
-(1, 2, 2, 'my-var'),
-(1, 2, 3, 'Reads user input');
-
-
+-- ============================================
+-- VIEWS
+-- ============================================
 
 CREATE VIEW StudentDetails AS
 SELECT 
@@ -632,7 +363,6 @@ SELECT
 FROM Students s
 JOIN Users u ON s.userId = u.id;
 
-
 CREATE VIEW CourseDetails AS
 SELECT 
   c.*,
@@ -641,7 +371,6 @@ FROM Courses c
 LEFT JOIN CourseInstructors ci ON c.id = ci.courseId
 LEFT JOIN Instructors i ON ci.instructorId = i.id
 GROUP BY c.id;
-
 
 CREATE VIEW EnrollmentDetails AS
 SELECT 
@@ -663,37 +392,16 @@ JOIN Students s ON e.studentId = s.id
 JOIN Users u ON s.userId = u.id
 JOIN Courses c ON e.courseId = c.id;
 
-CREATE VIEW QuizResults AS
-SELECT 
-  qs.id as submissionId,
-  qs.quizId,
-  q.title as quizTitle,
-  q.totalPoints,
-  q.passingScore,
-  qs.studentId,
-  CONCAT(u.firstName, ' ', u.lastName) as studentName,
-  u.email as studentEmail,
-  qs.score,
-  qs.submittedAt,
-  q.courseId,
-  c.name as courseName,
-  c.code as courseCode,
-  CASE 
-    WHEN qs.score >= q.passingScore THEN 'Pass'
-    ELSE 'Fail'
-  END as status
-FROM QuizSubmissions qs
-JOIN Quizzes q ON qs.quizId = q.id
-JOIN Students s ON qs.studentId = s.id
-JOIN Users u ON s.userId = u.id
-JOIN Courses c ON q.courseId = c.id;
-
-
+-- ============================================
+-- INDEXES
+-- ============================================
 
 CREATE INDEX idx_enrollment_student_semester ON Enrollments(studentId, semester, year);
 CREATE INDEX idx_enrollment_course_semester ON Enrollments(courseId, semester, year);
-CREATE INDEX idx_quiz_course ON Quizzes(courseId, dueDate);
-CREATE INDEX idx_submission_student ON QuizSubmissions(studentId, submittedAt);
+
+-- ============================================
+-- DATA VERIFICATION
+-- ============================================
 
 SHOW TABLES;
 
@@ -709,8 +417,6 @@ SELECT 'Enrollments', COUNT(*) FROM Enrollments
 UNION ALL
 SELECT 'CourseInstructors', COUNT(*) FROM CourseInstructors
 UNION ALL
-SELECT 'Quizzes', COUNT(*) FROM Quizzes
-UNION ALL
-SELECT 'QuizSubmissions', COUNT(*) FROM QuizSubmissions;
+SELECT 'ActivityLog', COUNT(*) FROM ActivityLog;
 
 SET FOREIGN_KEY_CHECKS = 1;

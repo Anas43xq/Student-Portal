@@ -1,18 +1,16 @@
 # 🎓 Student Portal
 
-A comprehensive web application for managing student enrollment, courses, quizzes, and academic records. Built with React frontend and Node.js backend.
+A comprehensive web application for managing student enrollment, courses, and academic records. Built with React frontend and Node.js backend.
 
 ## 🌟 Features
 
 ### 👨‍🎓 Student Features
 - **Course Enrollment**: Browse and enroll in available courses
 - **Academic Records**: View grades, GPA, and completed courses
-- **Quiz Participation**: Take quizzes and view results
 - **Profile Management**: Update personal information
 
 ### 👨‍🏫 Instructor Features
 - **Course Management**: Create and manage courses
-- **Quiz Creation**: Design and grade quizzes
 - **Student Oversight**: Monitor enrolled students
 - **Grade Management**: Assign and update student grades
 
@@ -152,13 +150,12 @@ The application uses **JWT (JSON Web Token) authentication** for secure, statele
    - User management
    - System statistics
    - Activity logs
-2. **Instructor**: 
-   - Course and quiz management
+2. **Instructor**:
+   - Course management
    - Grade submissions
    - View enrolled students
-3. **Student**: 
+3. **Student**:
    - Enrollment in courses
-   - Quiz participation
    - Grade and GPA tracking
 
 ## 📡 API Documentation
@@ -182,8 +179,6 @@ The application uses **JWT (JSON Web Token) authentication** for secure, statele
 
 ### Instructor Endpoints
 - `GET /api/instructor/stats` - Instructor dashboard
-- `POST /api/quizzes` - Create quiz
-- `GET /api/instructor/quiz-results` - View quiz results
 
 ## 🚀 Deployment
 
@@ -251,8 +246,6 @@ The application uses MySQL with the following main tables:
 - `Courses` - Course catalog
 - `Enrollments` - Student-course relationships
 - `Instructors` - Instructor information
-- `Quizzes` - Quiz definitions
-- `QuizSubmissions` - Student quiz attempts
 
 ## 🤝 Contributing
 

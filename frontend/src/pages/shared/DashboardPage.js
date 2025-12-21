@@ -15,10 +15,7 @@ const DashboardPage = () => {
     studentEnrolledCourses: 0,
     totalCredits: 0,
     instructorCourses: 0,
-    totalStudentsInCourses: 0,
-    activeQuizzes: 0,
-    passedStudents: 0,
-    failedStudents: 0
+    totalStudentsInCourses: 0
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -42,10 +39,7 @@ const DashboardPage = () => {
           const data = await instructorAPI.getStats();
           setStats({
             instructorCourses: data.instructorCourses || 0,
-            totalStudentsInCourses: data.totalStudentsInCourses || 0,
-            activeQuizzes: data.activeQuizzes || 0,
-            passedStudents: data.passedStudents || 0,
-            failedStudents: data.failedStudents || 0
+            totalStudentsInCourses: data.totalStudentsInCourses || 0
           });
         } else {
 
@@ -123,7 +117,6 @@ const DashboardPage = () => {
                   <li>View and manage your profile</li>
                   <li>Browse available courses and view course details</li>
                   <li>Enroll in courses (up to 18 credits for Fall/Spring, 10 credits for Summer)</li>
-                  <li>Take quizzes and track your academic progress</li>
                   <li>View your current GPA and earned credits</li>
                   <li>Monitor your enrollment status across all courses</li>
                 </ul>
@@ -256,9 +249,6 @@ const DashboardPage = () => {
           <div className="row">
             <StatCard title="My Courses" value={stats.instructorCourses || 0} icon={BookOpen} color="primary" />
             <StatCard title="Total Students" value={stats.totalStudentsInCourses || 0} icon={Users} color="success" />
-            <StatCard title="Active Quizzes" value={stats.activeQuizzes || 0} icon={Calendar} color="warning" />
-            <StatCard title="Students Passed" value={stats.passedStudents || 0} icon={CheckCircle} color="success" />
-            <StatCard title="Students Failed" value={stats.failedStudents || 0} icon={XCircle} color="danger" />
           </div>
         </section>
 
@@ -275,10 +265,6 @@ const DashboardPage = () => {
                 <ul className="mb-0">
                   <li>View and manage your assigned courses</li>
                   <li>Monitor student enrollments and performance</li>
-                  <li>Create and manage quizzes for your courses</li>
-                  <li>View quiz results and see who passed or failed</li>
-                  <li>Track student quiz submissions in real-time</li>
-                  <li>Analyze pass/fail statistics across all your quizzes</li>
                   <li>View course statistics and student progress reports</li>
                   <li>Update course materials and provide feedback</li>
                 </ul>

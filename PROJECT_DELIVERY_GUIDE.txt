@@ -1,0 +1,344 @@
+================================================================================
+STUDENT PORTAL - CSCI426 PROJECT PHASE 2 DELIVERY GUIDE
+================================================================================
+
+PROJECT OVERVIEW
+================================================================================
+Application Name: Student Portal
+Course: CSCI426 - Advanced Web Programming
+Submission Date: December 20, 2025
+
+The Student Portal is a comprehensive web application that enables:
+- Student course enrollment and management
+- Instructor course and student management
+- Admin dashboard and user administration
+- Real-time grade tracking and GPA calculation
+- Role-based access control with three user types: Admin, Instructor, Student
+
+================================================================================
+TECHNOLOGIES USED
+================================================================================
+
+BACKEND:
+- Node.js (Runtime environment)
+- Express.js (Web framework)
+- JWT (JSON Web Tokens for authentication)
+- MySQL (Database management)
+- Bcryptjs (Password hashing)
+- dotenv (Environment configuration)
+
+FRONTEND:
+- React.js (UI library)
+- Bootstrap 5 (CSS framework)
+- Lucide React Icons (UI icons)
+- CSS3 with dark/light theme support
+- LocalStorage (Client-side token storage)
+
+DEPLOYMENT:
+- Backend: Render (render.com)
+- Frontend: GitHub Pages
+- Version Control: Git & GitHub
+
+================================================================================
+DATABASE SCHEMA
+================================================================================
+
+ENTITIES IMPLEMENTED:
+
+1. Users Table
+   - id (PRIMARY KEY)
+   - username (UNIQUE)
+   - password (hashed)
+   - email (UNIQUE)
+   - role (Admin, Instructor, Student)
+   - firstName, lastName
+   - isBanned (BOOLEAN)
+   - banReason (TEXT)
+   - bannedAt (TIMESTAMP)
+
+2. Students Table
+   - id (PRIMARY KEY)
+   - userId (FOREIGN KEY → Users)
+   - gpa (DECIMAL)
+   - totalCredits (INT)
+   - status (Active/Inactive)
+
+3. Courses Table
+   - id (PRIMARY KEY)
+   - code (UNIQUE)
+   - name (VARCHAR)
+   - credits (INT)
+   - instructor_id (FOREIGN KEY → Instructors)
+   - semester (VARCHAR)
+
+4. Instructors Table
+   - id (PRIMARY KEY)
+   - userId (FOREIGN KEY → Users)
+   - department (VARCHAR)
+
+5. Enrollments Table
+   - id (PRIMARY KEY)
+   - student_id (FOREIGN KEY → Students)
+   - course_id (FOREIGN KEY → Courses)
+   - status (Active/Completed/Dropped)
+   - grade (VARCHAR)
+   - semester (VARCHAR)
+   - courseCredits (INT)
+
+6. Activities Table
+    - id (PRIMARY KEY)
+    - userId (FOREIGN KEY → Users)
+    - action (VARCHAR)
+    - timestamp (TIMESTAMP)
+
+================================================================================
+SETUP INSTRUCTIONS
+================================================================================
+
+BACKEND SETUP:
+
+1. Navigate to backend directory:
+   cd d:\student-portal\backend
+
+2. Install dependencies:
+   npm install
+
+3. Create/Configure .env file (use .env.example as template):
+   DB_HOST=your_database_host
+   DB_USER=your_database_user
+   DB_PASSWORD=your_database_password
+   DB_NAME=student_portal
+   DB_PORT=3306
+   JWT_SECRET=your_jwt_secret_key
+   PORT=3001
+   CORS_ORIGIN=your_frontend_url
+
+4. Initialize database:
+   - Import schema.sql into MySQL
+   - Run: mysql -u root -p student_portal < schema.sql
+
+5. Start server:
+   npm start
+   (Server runs on http://localhost:3001)
+
+FRONTEND SETUP:
+
+1. Navigate to frontend directory:
+   cd d:\student-portal\frontend
+
+2. Install dependencies:
+   npm install
+
+3. Update API_BASE_URL in src/services/api.js:
+   const API_BASE_URL = 'https://student-portal-owa4.onrender.com';
+
+4. Run development server:
+   npm start
+   (Opens http://localhost:3000)
+
+5. Build for production:
+   npm run build
+
+================================================================================
+IMPLEMENTED FEATURES
+================================================================================
+
+CORE FEATURES ():
+
+Authentication & Authorization:
+✓ User registration with role selection
+✓ JWT-based login system
+✓ Password hashing with bcryptjs
+✓ Role-based access control (Admin, Instructor, Student)
+✓ Session validation
+✓ Secure logout
+
+Student Features:
+✓ View enrolled courses
+✓ Manage course enrollments
+✓ Track GPA and total credits
+✓ View student profile and instructors
+
+Instructor Features:
+✓ Create and manage courses
+✓ View enrolled students
+✓ Dashboard with statistics
+
+Admin Features:
+✓ User management (create, edit, delete, ban)
+✓ View all students, instructors, courses
+✓ Manage enrollments
+✓ View system activities and logs
+✓ Dashboard with system statistics
+✓ Settings management
+
+CODE QUALITY ():
+
+✓ Clean, readable code with proper indentation
+✓ Consistent naming conventions
+✓ Error handling and validation
+✓ RESTful API design
+✓ Modular component structure
+✓ Comments removed for production
+✓ No console.log in production code
+✓ Proper file organization
+rack GPA and total credits
+✓ View student profile and instructors
+
+Instructor Features:
+✓ Create and manage courses
+✓ View enrolled student
+DEPLOYMENT ():
+
+✓ Backend deployed on Render
+✓ Frontend deployed on GitHub Pages
+✓ Git version control with commit history
+✓ Environment configuration
+✓ CORS configuration
+✓ Proper error responses
+
+BONUS FEATURES:
+
+✓ Dark/Light theme toggle
+✓ Activity logging system
+✓ User banning functionality
+✓ Admin role management
+✓ Responsive design for mobile devices
+✓ GPA and credit tracking
+✓ Semester-based course management
+
+================================================================================
+API ENDPOINTS
+================================================================================
+
+AUTHENTICATION:
+POST   /register              - Register new user
+POST   /login                 - User login
+POST   /logout                - User logout
+GET    /api/auth/validate     - Validate token
+GET    /api/auth/session      - Check session
+
+STUDENTS (Admin only):
+GET    /api/students          - Get all students
+GET    /api/students/:id      - Get student by ID
+POST   /api/students          - Create student
+PUT    /api/students/:id      - Update student
+DELETE /api/students/:id      - Delete student
+
+COURSES:
+GET    /api/courses           - Get all courses
+GET    /api/courses/:id       - Get course by ID
+POST   /api/courses           - Create course (Instructor/Admin)
+PUT    /api/courses/:id       - Update course
+DELETE /api/courses/:id       - Delete course
+
+ENROLLMENTS:
+GET    /api/enrollments       - Get enrollments
+POST   /api/enrollments       - Create enrollment
+PUT    /api/enrollments/:id   - Update enrollment
+DELETE /api/enrollments/:id   - Delete enrollment
+
+ADMIN:
+GET    /api/admin/stats       - Dashboard statistics
+GET    /api/admin/users       - Get all users
+POST   /api/admin/users       - Create user
+POST   /api/admin/users/:id/ban - Ban user
+POST   /api/admin/users/:id/unban - Unban user
+DELETE /api/admin/users/:id   - Delete user
+GET    /api/admin/activities  - View activity logs
+
+================================================================================
+LIVE DEPLOYMENT URLS
+================================================================================
+
+Backend (Render):
+https://student-portal-owa4.onrender.com
+
+Frontend (GitHub Pages):
+https://anas43xq.github.io/student-portal
+
+GitHub Repository:
+https://github.com/anas43xq/student-portal
+
+================================================================================
+TEST CREDENTIALS
+================================================================================
+
+Admin Account:
+Username: admin
+Password: admin123
+Role: Admin
+
+Password: student123
+Role: Student
+
+(Create additional test accounts through the application)
+
+================================================================================
+CODE QUALITY CHECKLIST
+================================================================================
+
+Backend (Node.js):
+✓ No syntax errors
+✓ Proper error handling with try-catch
+✓ Input validation for all endpoints
+✓ SQL injection prevention with parameterized queries
+✓ Password hashing with bcryptjs
+✓ JWT token validation
+✓ CORS properly configured
+✓ Environment variables for sensitive data
+✓ Consistent code formatting
+✓ No console.log statements (except errors)
+✓ Comments removed for production
+
+Frontend (React):
+✓ No console errors or warnings
+✓ Proper component structure
+✓ State management with hooks
+✓ Error boundary implementation
+✓ Loading states for async operations
+✓ Form validation
+✓ Responsive design
+✓ Accessibility considerations
+✓ No commented-out code
+✓ Clean imports and exports
+
+================================================================================
+COMMON ISSUES & SOLUTIONS
+================================================================================
+
+Issue: "Student ID not found" error when logging in as admin
+Solution: The admin account doesn't have a student record. This is normal.
+          Ensure admin role is set correctly in the database.
+
+Issue: CORS error when frontend calls backend
+Solution: Check CORS_ORIGIN in backend .env file
+          Ensure it matches your frontend URL
+          Verify backend is running and accessible
+
+Issue: Database connection failed
+Solution: Check MySQL is running
+          Verify credentials in .env file
+          Confirm database exists: CREATE DATABASE student_portal;
+
+Issue: Admin panel not showing users
+Solution: Ensure logged-in user has Admin role
+          Check database has users with Admin role
+          Verify API endpoint returns data
+================================================================================
+SUPPORT & DOCUMENTATION
+================================================================================
+
+For detailed setup and troubleshooting:
+1. Check README.md in repository
+2. Review schema.sql for database structure
+3. Check .env.example for required environment variables
+4. Verify error messages in browser console
+5. Check backend logs in Render dashboard
+
+Key Files:
+- backend/server.js - Main backend server file
+- frontend/src/App.js - Main React application
+- frontend/src/services/api.js - API service layer
+- backend/schema.sql - Database schema
+- package.json - Dependencies (frontend and backend)

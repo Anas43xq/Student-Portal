@@ -294,7 +294,7 @@ const ProfilePage = () => {
               <p className="mb-0 small">
                 {user.role === 'Admin' 
                   ? 'As an administrator, you have full access to manage the student portal system, including students, courses, instructors, and enrollments.'
-                  : 'As an instructor, you can manage your courses, create quizzes, and monitor student progress in your assigned classes.'}
+                  : 'As an instructor, you can manage your courses and monitor student progress in your assigned classes.'}
               </p>
             </div>
           </div>

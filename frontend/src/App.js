@@ -11,8 +11,6 @@ import StudentDetailsPage from './pages/admin/StudentDetailsPage';
 import EnrollmentsPage from './pages/admin/EnrollmentsPage';
 import AdminPage from './pages/admin/AdminPage';
 import CoursesPage from './pages/student/CoursesPage';
-import QuizzesPage from './pages/student/QuizzesPage';
-import QuizResultsPage from './pages/instructor/QuizResultsPage';
 import './styles/App.css';
 
 const App = () => {
@@ -98,12 +96,6 @@ const App = () => {
       
       case 'instructors':
         return <InstructorsPage />;
-      
-      case 'quizzes':
-        return <QuizzesPage />;
-      
-      case 'quiz-results':
-        return <QuizResultsPage />;
       
       case 'admin':
         return <AdminPage />;
