@@ -932,7 +932,7 @@ app.post("/api/enrollments", requireAuth, (req, res) => {
               }
 
               db.query(
-                "INSERT INTO Enrollments (studentId, courseId, semester, year) VALUES (?, ?, ?, ?)",
+                "INSERT INTO Enrollments (studentId, courseId, semester, year, status, enrolledAt) VALUES (?, ?, ?, ?, 'Active', NOW())",
                 [studentId, courseId, semester, year],
                 (err, result) => {
                   if (err) {
