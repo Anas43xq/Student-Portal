@@ -357,16 +357,16 @@ const CoursesPage = () => {
                     <dd><span className="badge bg-secondary">{course.semester}</span></dd>
                   </div>
                   <div className="info-item">
-                    <dt>Enrollment:</dt>
-                    <dd>{course.enrolled}/{course.capacity}</dd>
+                    <dt>Total Students Enrolled:</dt>
+                    <dd>{course.currentEnrollment}/{course.capacity}</dd>
                   </div>
                 </dl>
-                <div className="progress mt-2" style={{ height: '6px' }}>
-                  <div 
-                    className="progress-bar bg-success" 
-                    role="progressbar"
-                    style={{ width: `${(course.enrolled / course.capacity) * 100}%` }}
-                    aria-valuenow={course.enrolled}
+                  <div className="progress mt-2" style={{ height: '8px' }}>
+                    <div 
+                      className="progress-bar bg-success" 
+                      role="progressbar"
+                      style={{ width: `${(course.currentEnrollment / course.capacity) * 100}%` }}
+                      aria-valuenow={course.currentEnrollment}
                     aria-valuemin="0"
                     aria-valuemax={course.capacity}
                   ></div>
@@ -382,9 +382,9 @@ const CoursesPage = () => {
                     <button 
                       className="btn btn-sm btn-primary"
                       onClick={() => handleRegister(course)}
-                      disabled={enrolling || course.enrolled >= course.capacity}
+                      disabled={enrolling || course.currentEnrollment >= course.capacity}
                     >
-                      {course.enrolled >= course.capacity ? 'Full' : 'Register'}
+                      {course.currentEnrollment >= course.capacity ? 'Full' : 'Register'}
                     </button>
                   )
                 ) : user.role === 'Admin' ? (
