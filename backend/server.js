@@ -912,6 +912,7 @@ app.post("/api/enrollments", requireAuth, (req, res) => {
           }
 
           const currentCredits = creditResults[0].totalCredits || 0;
+          console.log(`Credit check: Student ${studentId}, ${semester} ${year}, Current: ${currentCredits}`);
 
           db.query(
             "SELECT credits FROM Courses WHERE id = ?",
@@ -922,6 +923,7 @@ app.post("/api/enrollments", requireAuth, (req, res) => {
               }
 
               const courseCredits = courseResults[0].credits;
+              console.log(`Adding course ${courseId} (${courseCredits} credits). Total would be: ${currentCredits + courseCredits}`);
 
               if (currentCredits + courseCredits > 18) {
                 return res.status(400).json({
