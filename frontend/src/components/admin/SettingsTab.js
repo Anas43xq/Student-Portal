@@ -106,14 +106,6 @@ const SettingsTab = () => {
                 </label>
               </div>
             </div>
-            <div className="mb-3">
-              <div className="form-check">
-                <input className="form-check-input" type="checkbox" id="enableNotifications" defaultChecked />
-                <label className="form-check-label" htmlFor="enableNotifications">
-                  Enable Email Notifications
-                </label>
-              </div>
-            </div>
           </fieldset>
           
           <button type="submit" className="btn btn-primary">Save Settings</button>
