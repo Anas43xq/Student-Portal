@@ -637,10 +637,8 @@ app.get("/api/courses", requireAuth, (req, res) => {
   const { search, department, semester } = req.query;
 
   let query = `
-    SELECT c.*,
-           COUNT(e.id) as currentEnrollment
+    SELECT c.*
     FROM Courses c
-    LEFT JOIN Enrollments e ON c.id = e.courseId AND e.status = 'Active'
     WHERE 1=1
   `;
   const params = [];
@@ -659,8 +657,6 @@ app.get("/api/courses", requireAuth, (req, res) => {
     query += ` AND c.semester = ?`;
     params.push(semester);
   }
-
-  query += ` GROUP BY c.id`;
 
   db.query(query, params, (err, results) => {
     if (err) {
@@ -698,12 +694,7 @@ app.get("/api/courses/:id", requireAuth, (req, res) => {
   const { id } = req.params;
 
   db.query(
-    `SELECT c.*,
-            COUNT(e.id) as currentEnrollment
-     FROM Courses c
-     LEFT JOIN Enrollments e ON c.id = e.courseId AND e.status = 'Active'
-     WHERE c.id = ?
-     GROUP BY c.id`,
+    "SELECT * FROM Courses WHERE id = ?",
     [id],
     (err, results) => {
       if (err) {
