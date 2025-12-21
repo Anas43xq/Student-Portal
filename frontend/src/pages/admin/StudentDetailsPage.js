@@ -113,6 +113,10 @@ const StudentDetailsPage = ({ studentId, onBack }) => {
                 <span>{student.totalCredits || '0'}</span>
               </div>
               <div className="info-item">
+                <strong>Completed Credits:</strong>
+                <span>{student.completedCredits || '0'}</span>
+              </div>
+              <div className="info-item">
                 <strong>Enrollment Date:</strong>
                 <span>{student.enrollmentDate ? new Date(student.enrollmentDate).toLocaleDateString() : 'N/A'}</span>
               </div>
@@ -142,12 +146,12 @@ const StudentDetailsPage = ({ studentId, onBack }) => {
                   <p className="text-muted mb-0">Total Credits</p>
                 </div>
                 <div className="col-3">
-                  <h3 className="text-info">{enrollments.length}</h3>
-                  <p className="text-muted mb-0">Total Courses</p>
+                  <h3 className="text-warning">{student.completedCredits || '0'}</h3>
+                  <p className="text-muted mb-0">Completed</p>
                 </div>
                 <div className="col-3">
-                  <h3 className="text-warning">{enrollments.filter(e => e.status === 'Completed').length}</h3>
-                  <p className="text-muted mb-0">Completed</p>
+                  <h3 className="text-info">{enrollments.length}</h3>
+                  <p className="text-muted mb-0">Total Courses</p>
                 </div>
               </div>
             </div>

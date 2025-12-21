@@ -125,9 +125,13 @@ const ProfilePage = () => {
                 <dt className="text-muted small"><Calendar size={14} className="me-1" />Enrollment Date:</dt>
                 <dd className="mb-0">{profileData.enrollmentDate ? new Date(profileData.enrollmentDate).toLocaleDateString() : 'N/A'}</dd>
               </div>
-              <div className="info-item">
+              <div className="info-item mb-3">
                 <dt className="text-muted small">Total Credits:</dt>
                 <dd className="mb-0"><strong className="text-success">{profileData.totalCredits || 0}</strong></dd>
+              </div>
+              <div className="info-item">
+                <dt className="text-muted small">Completed Credits:</dt>
+                <dd className="mb-0"><strong className="text-info">{profileData.completedCredits || 0}</strong></dd>
               </div>
             </dl>
           </div>
@@ -146,16 +150,16 @@ const ProfilePage = () => {
                 <p className="text-muted mb-0 small">Current GPA</p>
               </div>
               <div className="col-md-3 mb-3 mb-md-0">
-                <h4 className="text-success mb-1">{enrollments.length}</h4>
-                <p className="text-muted mb-0 small">Total Enrollments</p>
+                <h4 className="text-success mb-1">{profileData.totalCredits || 0}</h4>
+                <p className="text-muted mb-0 small">Total Credits</p>
               </div>
               <div className="col-md-3 mb-3 mb-md-0">
-                <h4 className="text-info mb-1">{enrollments.filter(e => e.status === 'Completed').length}</h4>
+                <h4 className="text-info mb-1">{profileData.completedCredits || 0}</h4>
                 <p className="text-muted mb-0 small">Completed</p>
               </div>
               <div className="col-md-3">
-                <h4 className="text-warning mb-1">{profileData.totalCredits || 0}</h4>
-                <p className="text-muted mb-0 small">Credits Earned</p>
+                <h4 className="text-warning mb-1">{enrollments.length}</h4>
+                <p className="text-muted mb-0 small">Total Courses</p>
               </div>
             </div>
           </div>

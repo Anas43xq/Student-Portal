@@ -308,7 +308,8 @@ app.get("/api/students", requireAdmin, (req, res) => {
 
   let query = `
     SELECT s.*, u.firstName, u.lastName, u.email,
-           COALESCE(SUM(CASE WHEN e.status = 'Completed' THEN c.credits ELSE 0 END), 0) as calculatedTotalCredits
+           COALESCE(SUM(CASE WHEN e.status = 'Completed' THEN c.credits ELSE 0 END), 0) as completedCreditsCalc,
+           COALESCE(SUM(CASE WHEN e.grade IS NOT NULL AND e.grade != '' THEN c.credits ELSE 0 END), 0) as totalCreditsCalc
     FROM Students s
     JOIN Users u ON s.userId = u.id
     LEFT JOIN Enrollments e ON s.id = e.studentId
@@ -347,10 +348,11 @@ app.get("/api/students", requireAdmin, (req, res) => {
         return res.status(500).json({ message: "Database error" });
       }
 
-      // Replace totalCredits with calculated value
+      // Map both completed and total credits
       const studentsWithCalculatedCredits = results.map(student => ({
         ...student,
-        totalCredits: student.calculatedTotalCredits,
+        completedCredits: student.completedCreditsCalc,
+        totalCredits: student.totalCreditsCalc,
       }));
 
       res.json({
@@ -429,14 +431,17 @@ function getStudentById(id, res) {
           let totalPoints = 0;
           let totalCreditsForGPA = 0;
           let completedCredits = 0;
+          let allCreditsWithGrades = 0;
 
           enrollments.forEach(enrollment => {
             if (enrollment.grade && gradePoints[enrollment.grade] !== undefined) {
               const credits = parseInt(enrollment.credits) || 0;
               totalPoints += gradePoints[enrollment.grade] * credits;
               totalCreditsForGPA += credits;
+              // Count all credits that have grades
+              allCreditsWithGrades += credits;
             }
-            // Calculate totalCredits from COMPLETED enrollments only
+            // Count only COMPLETED enrollments
             if (enrollment.status === 'Completed') {
               completedCredits += parseInt(enrollment.credits) || 0;
             }
@@ -447,7 +452,8 @@ function getStudentById(id, res) {
           res.json({
             ...results[0],
             gpa: calculatedGPA,
-            totalCredits: completedCredits,
+            completedCredits: completedCredits,
+            totalCredits: allCreditsWithGrades,
             enrollments: enrollments || []
           });
         }
