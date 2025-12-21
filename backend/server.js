@@ -1484,7 +1484,7 @@ app.delete("/api/instructors/:id", requireAdmin, (req, res) => {
 app.get("/api/instructor/stats", requireAuth, (req, res) => {
   const userId = req.user.id;
 
-  db.query("SELECT id FROM instructors WHERE userId = ?", [userId], (err, instructorResult) => {
+  db.query("SELECT id FROM Instructors WHERE userId = ?", [userId], (err, instructorResult) => {
     if (err) {
       console.error(err);
       return res.status(500).json({ message: "Database error" });
@@ -1501,7 +1501,7 @@ app.get("/api/instructor/stats", requireAuth, (req, res) => {
 
     const coursesQuery = `
       SELECT COUNT(DISTINCT ci.courseId) as count
-      FROM courseinstructors ci
+      FROM CourseInstructors ci
       WHERE ci.instructorId = ?
     `;
 
@@ -1515,8 +1515,8 @@ app.get("/api/instructor/stats", requireAuth, (req, res) => {
 
       const studentsQuery = `
         SELECT COUNT(DISTINCT e.studentId) as count
-        FROM enrollments e
-        JOIN courseinstructors ci ON e.courseId = ci.courseId
+        FROM Enrollments e
+        JOIN CourseInstructors ci ON e.courseId = ci.courseId
         WHERE ci.instructorId = ? AND e.status = 'Active'
       `;
 

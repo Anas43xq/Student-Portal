@@ -405,6 +405,16 @@ export const instructorAPI = {
     } catch (error) {
       return handleError(error);
     }
+  },
+
+  getStudents: async (instructorId, params = {}) => {
+    try {
+      const queryString = new URLSearchParams(params).toString();
+      const response = await apiFetch(`${API_BASE_URL}/api/instructors/${instructorId}/students?${queryString}`);
+      return await handleResponse(response);
+    } catch (error) {
+      return handleError(error);
+    }
   }
 };
 
