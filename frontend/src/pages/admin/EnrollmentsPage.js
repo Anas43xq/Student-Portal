@@ -299,39 +299,57 @@ const EnrollmentsPage = () => {
                 <form onSubmit={handleSubmit}>
                   <div className="mb-3">
                     <label className="form-label">Student *</label>
-                    <select
-                      className="form-select"
-                      name="studentId"
-                      value={formData.studentId}
-                      onChange={handleInputChange}
-                      required
-                      disabled={modalMode === 'edit'}
-                    >
-                      <option value="">Select Student</option>
-                      {students.map(student => (
-                        <option key={student.id} value={student.id}>
-                          {student.firstName} {student.lastName} ({student.email})
-                        </option>
-                      ))}
-                    </select>
+                    {modalMode === 'edit' ? (
+                      <input
+                        type="text"
+                        className="form-control"
+                        value={currentEnrollment ? `${currentEnrollment.firstName} ${currentEnrollment.lastName}` : ''}
+                        disabled
+                        readOnly
+                      />
+                    ) : (
+                      <select
+                        className="form-select"
+                        name="studentId"
+                        value={formData.studentId}
+                        onChange={handleInputChange}
+                        required
+                      >
+                        <option value="">Select Student</option>
+                        {students.map(student => (
+                          <option key={student.id} value={student.id}>
+                            {student.firstName} {student.lastName} ({student.email})
+                          </option>
+                        ))}
+                      </select>
+                    )}
                   </div>
                   <div className="mb-3">
                     <label className="form-label">Course *</label>
-                    <select
-                      className="form-select"
-                      name="courseId"
-                      value={formData.courseId}
-                      onChange={handleInputChange}
-                      required
-                      disabled={modalMode === 'edit'}
-                    >
-                      <option value="">Select Course</option>
-                      {courses.map(course => (
-                        <option key={course.id} value={course.id}>
-                          {course.code} - {course.name} ({course.credits} credits)
-                        </option>
-                      ))}
-                    </select>
+                    {modalMode === 'edit' ? (
+                      <input
+                        type="text"
+                        className="form-control"
+                        value={currentEnrollment ? `${currentEnrollment.courseCode} - ${currentEnrollment.courseName}` : ''}
+                        disabled
+                        readOnly
+                      />
+                    ) : (
+                      <select
+                        className="form-select"
+                        name="courseId"
+                        value={formData.courseId}
+                        onChange={handleInputChange}
+                        required
+                      >
+                        <option value="">Select Course</option>
+                        {courses.map(course => (
+                          <option key={course.id} value={course.id}>
+                            {course.code} - {course.name} ({course.credits} credits)
+                          </option>
+                        ))}
+                      </select>
+                    )}
                   </div>
                   <div className="row">
                     <div className="col-md-6 mb-3">
