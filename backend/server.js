@@ -307,9 +307,12 @@ app.get("/api/students", requireAdmin, (req, res) => {
   const { search, status, page = 1, limit = 10 } = req.query;
 
   let query = `
-    SELECT s.*, u.firstName, u.lastName, u.email
+    SELECT s.*, u.firstName, u.lastName, u.email,
+           COALESCE(SUM(CASE WHEN e.status = 'Completed' THEN c.credits ELSE 0 END), 0) as calculatedTotalCredits
     FROM Students s
     JOIN Users u ON s.userId = u.id
+    LEFT JOIN Enrollments e ON s.id = e.studentId
+    LEFT JOIN Courses c ON e.courseId = c.id
     WHERE 1=1
   `;
   const params = [];
@@ -323,6 +326,8 @@ app.get("/api/students", requireAdmin, (req, res) => {
     query += ` AND s.status = ?`;
     params.push(status);
   }
+
+  query += ` GROUP BY s.id`;
 
   db.query(query, params, (err, countResults) => {
     if (err) {
@@ -342,8 +347,14 @@ app.get("/api/students", requireAdmin, (req, res) => {
         return res.status(500).json({ message: "Database error" });
       }
 
+      // Replace totalCredits with calculated value
+      const studentsWithCalculatedCredits = results.map(student => ({
+        ...student,
+        totalCredits: student.calculatedTotalCredits,
+      }));
+
       res.json({
-        students: results,
+        students: studentsWithCalculatedCredits,
         total,
         page: parseInt(page),
         pages: Math.ceil(total / limit)
@@ -416,26 +427,27 @@ function getStudentById(id, res) {
           };
 
           let totalPoints = 0;
-          let totalCredits = 0;
-          let earnedCredits = 0;
+          let totalCreditsForGPA = 0;
+          let completedCredits = 0;
 
           enrollments.forEach(enrollment => {
             if (enrollment.grade && gradePoints[enrollment.grade] !== undefined) {
               const credits = parseInt(enrollment.credits) || 0;
               totalPoints += gradePoints[enrollment.grade] * credits;
-              totalCredits += credits;
+              totalCreditsForGPA += credits;
             }
+            // Calculate totalCredits from COMPLETED enrollments only
             if (enrollment.status === 'Completed') {
-              earnedCredits += parseInt(enrollment.credits) || 0;
+              completedCredits += parseInt(enrollment.credits) || 0;
             }
           });
 
-          const calculatedGPA = totalCredits > 0 ? (totalPoints / totalCredits).toFixed(2) : null;
+          const calculatedGPA = totalCreditsForGPA > 0 ? (totalPoints / totalCreditsForGPA).toFixed(2) : null;
 
           res.json({
             ...results[0],
             gpa: calculatedGPA,
-            totalCredits: results[0].totalCredits,
+            totalCredits: completedCredits,
             enrollments: enrollments || []
           });
         }
