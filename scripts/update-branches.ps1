@@ -60,6 +60,9 @@ try {
         Write-Output "No working-tree changes detected."
     }
 
+    Write-Output "Fetching latest remote info..."
+    Exec-Git 'fetch' 'origin'
+
     Write-Output "Pushing 'main' to origin..."
     Exec-Git 'push' 'origin' 'main'
 
