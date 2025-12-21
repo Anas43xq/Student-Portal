@@ -3,8 +3,6 @@ import { Search, BookOpen, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { coursesAPI, enrollmentsAPI, instructorsAPI } from '../../services/api';
 
-const CREDIT_LIMITS = { Fall: 18, Spring: 18, Summer: 10 };
-
 const CoursesPage = () => {
   const { user } = useAuth();
   const [courses, setCourses] = useState([]);
@@ -120,14 +118,6 @@ const CoursesPage = () => {
       return;
     }
 
-    const creditLimit = CREDIT_LIMITS[currentSemester];
-    const newTotalCredits = currentCredits + course.credits;
-    
-    if (newTotalCredits > creditLimit) {
-      alert(`Cannot register! You can only register up to ${creditLimit} credits in ${currentSemester} semester. Current: ${currentCredits}, Course: ${course.credits}`);
-      return;
-    }
-
     if (course.currentEnrollment >= course.capacity) {
       alert('This course is full!');
       return;
@@ -148,7 +138,6 @@ const CoursesPage = () => {
         year: course.year || new Date().getFullYear()
       };
       console.log('Enrollment request:', enrollmentData);
-      console.log('Current credits:', currentCredits, 'Course credits:', course.credits);
       
       await enrollmentsAPI.create(enrollmentData);
       
@@ -295,9 +284,7 @@ const CoursesPage = () => {
       {user.role === 'Student' && (
         <section className="alert alert-info mb-4">
           <AlertCircle size={20} className="me-2" />
-          <strong>Current Semester: {currentSemester}</strong> | 
-          Credits: {currentCredits} / {CREDIT_LIMITS[currentSemester]} | 
-          Available: {CREDIT_LIMITS[currentSemester] - currentCredits} credits
+          <strong>Current Semester: {currentSemester}</strong>
         </section>
       )}
 
