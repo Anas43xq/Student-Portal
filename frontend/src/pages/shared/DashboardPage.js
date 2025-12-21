@@ -116,7 +116,7 @@ const DashboardPage = () => {
                 <ul className="mb-0">
                   <li>View and manage your profile</li>
                   <li>Browse available courses and view course details</li>
-                  <li>Enroll in courses (up to 18 credits for Fall/Spring, 10 credits for Summer)</li>
+                  <li>Enroll in courses</li>
                   <li>View your current GPA and earned credits</li>
                   <li>Monitor your enrollment status across all courses</li>
                 </ul>

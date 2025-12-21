@@ -77,25 +77,6 @@ const SettingsTab = () => {
               </select>
             </div>
           </fieldset>
-          
-          <fieldset>
-            <legend className="h6 mb-3">Credit Limits</legend>
-            <div className="row">
-              <div className="col-md-4 mb-3">
-                <label htmlFor="fall-credits" className="form-label">Fall Semester Credits</label>
-                <input id="fall-credits" type="number" className="form-control" defaultValue="18" />
-              </div>
-              <div className="col-md-4 mb-3">
-                <label htmlFor="spring-credits" className="form-label">Spring Semester Credits</label>
-                <input id="spring-credits" type="number" className="form-control" defaultValue="18" />
-              </div>
-              <div className="col-md-4 mb-3">
-                <label htmlFor="summer-credits" className="form-label">Summer Semester Credits</label>
-                <input id="summer-credits" type="number" className="form-control" defaultValue="10" />
-              </div>
-            </div>
-          </fieldset>
-
           <fieldset>
             <legend className="h6 mb-3">System Preferences</legend>
             <div className="mb-3">

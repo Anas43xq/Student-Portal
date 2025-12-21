@@ -460,7 +460,7 @@ const StudentsPage = ({ onViewDetails }) => {
                         disabled
                         title="Total credits are automatically calculated based on completed courses"
                       />
-                      <small className="form-text text-muted mt-1">Auto-calculated. Max enrollable: 18 credits/semester</small>
+                      <small className="form-text text-muted mt-1">Auto-calculated based on completed courses</small>
                     </div>
                     <div className="col-md-4">
                       <label className="form-label">Status</label>
