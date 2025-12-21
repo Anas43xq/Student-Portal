@@ -432,20 +432,12 @@ function getStudentById(id, res) {
 
           const calculatedGPA = totalCredits > 0 ? (totalPoints / totalCredits).toFixed(2) : null;
 
-          db.query(
-            'UPDATE Students SET gpa = ?, totalCredits = ? WHERE id = ?',
-            [calculatedGPA, earnedCredits, id],
-            (updateErr) => {
-              if (updateErr) console.error('Failed to update GPA/credits:', updateErr);
-
-              res.json({
-                ...results[0],
-                gpa: calculatedGPA,
-                totalCredits: earnedCredits,
-                enrollments: enrollments || []
-              });
-            }
-          );
+          res.json({
+            ...results[0],
+            gpa: calculatedGPA,
+            totalCredits: results[0].totalCredits,
+            enrollments: enrollments || []
+          });
         }
       );
     }
